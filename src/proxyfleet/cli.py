@@ -7,6 +7,10 @@ import json
 import sys
 
 from . import __version__
+from pathlib import Path
+
+from .collect import CollectError, DirSource, SshSource, collect
+from .fsutil import OutputError
 from .inventory import InventoryError, load
 from .plan import build_plan
 
@@ -64,6 +68,38 @@ def cmd_plan(args) -> int:
     return EXIT_OK
 
 
+def cmd_collect(args) -> int:
+    inventory = _load(args.inventory)
+    if inventory is None:
+        return EXIT_INVALID
+    if args.source_dir:
+        source = DirSource(Path(args.source_dir))
+    else:
+        try:
+            source = SshSource(user=args.ssh_user, options=args.ssh_option or [],
+                               remote_command=args.remote_command, timeout=args.timeout,
+                               attempts=args.attempts)
+        except ValueError as error:
+            print(f"error: {error}", file=sys.stderr)
+            return EXIT_USAGE
+    try:
+        manifest = collect(inventory, source, Path(args.out), include_observing=args.include_observing,
+                           progress=lambda line: print(line, flush=True))
+    except CollectError as error:
+        print(f"error: collection failed; {args.out} was not changed:", file=sys.stderr)
+        for line in error.failures:
+            print(f"  - {line}", file=sys.stderr)
+        return EXIT_INVALID
+    except OutputError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return EXIT_INVALID
+    total = sum(len(c["nodes"]) for m in manifest["fragments"].values() for c in m.values())
+    print(f"collected {total} nodes from {len(manifest['fragments'])} machines into {args.out}")
+    print("warning: these files contain node credentials; keep them out of Git, cloud drives and chats",
+          file=sys.stderr)
+    return EXIT_OK
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="proxyfleet",
@@ -81,6 +117,22 @@ def main(argv=None) -> int:
                       help="include observing machines (canary build)")
     plan.add_argument("--json", action="store_true", help="machine-readable output")
     plan.set_defaults(func=cmd_plan)
+
+    col = sub.add_parser("collect", help="fetch node fragments from every enabled machine")
+    col.add_argument("inventory", help="path to fleet.yaml")
+    col.add_argument("--out", required=True, help="output directory (replaced only if every fragment passes)")
+    col.add_argument("--include-observing", action="store_true",
+                     help="include observing machines (canary build)")
+    col.add_argument("--from", dest="source_dir", metavar="DIR",
+                     help="read <DIR>/<machine>/{surge.txt,loon.txt,mihomo.yaml} instead of using SSH")
+    col.add_argument("--ssh-user", help="SSH user (default: from your SSH config)")
+    col.add_argument("--ssh-option", action="append", metavar="OPT",
+                     help="extra ssh argument, repeatable, e.g. --ssh-option=-p --ssh-option=2222")
+    col.add_argument("--remote-command", default="frm-node", help="frm-node command on the server")
+    col.add_argument("--timeout", type=float, default=60, help="seconds per SSH attempt")
+    col.add_argument("--attempts", type=int, default=3, choices=range(1, 6), metavar="1-5",
+                     help="SSH attempts per fragment")
+    col.set_defaults(func=cmd_collect)
 
     try:
         args = parser.parse_args(argv)

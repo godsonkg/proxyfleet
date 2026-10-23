@@ -7,7 +7,7 @@
 
 用一份清单文件管理多台自建代理服务器，并规划配套的 Surge、Loon、Mihomo（Clash Meta）订阅。
 
-> **状态：早期开发（0.1.0.dev0）。** 目前可用 `validate` 和 `plan`；采集节点、生成订阅文件和发布是下一步，见 [设计文档](docs/design.md)。
+> **状态：早期开发（0.1.0.dev0）。** 目前可用 `validate`、`plan` 和 `collect`；生成订阅文件和发布是下一步，见 [设计文档](docs/design.md)。
 
 ## 解决什么问题
 
@@ -55,11 +55,29 @@ proxyfleet plan ~/private/fleet.yaml --json
 
 `plan` 按客户端列出有序的节点名称、组成的分组和契约数量。所有选项及注释见 [`examples/fleet.example.yaml`](examples/fleet.example.yaml)。
 
+### 采集节点片段
+
+`collect` 采集每台启用机器的节点片段，并检查每个片段是否恰好包含清单期望的节点（命名为 `<机器名>-<协议>`）：
+
+```bash
+# 通过 SSH 在每台服务器上运行 `frm-node sub fragment`（服务器上需要 root）
+proxyfleet collect ~/private/fleet.yaml --out ~/private/collected --ssh-user root
+
+# 或使用已有的片段：<目录>/<机器名>/surge.txt、loon.txt、mihomo.yaml
+proxyfleet collect ~/private/fleet.yaml --out ~/private/collected --from ~/private/fragments
+```
+
+- 所有片段都通过才会写入；**任何一个失败都不写入**，上一次的输出保持原样，所有失败一次列出。
+- 输出目录和文件只有你自己能读（Unix 上是 `0700`/`0600`，Windows 上是仅当前用户的 ACL）。
+- 已有的 `--out` 目录只有在为空或是上一次 proxyfleet 的输出时才会被替换，指错目录也不会删掉你的文件。
+- SSH 使用批处理模式，连接超时 10 秒，每个片段最多尝试 3 次；额外的 ssh 参数（如端口）用 `--ssh-option` 传入。
+- 错误只指出机器、客户端和出错的节点名，不回显片段内容。
+
 ## 路线图
 
 | 版本 | 范围 |
 |---|---|
-| 0.1 | `validate`、`plan`（已完成）；`collect` 通过 SSH 或本地目录采集节点片段；`build` 生成三端 provider 文件、用途分组和契约；`diff` 与上一版比较（只显示名称和数量） |
+| 0.1 | `validate`、`plan`、`collect`（已完成）；`build` 生成三端 provider 文件、用途分组和契约；`diff` 与上一版比较（只显示名称和数量） |
 | 0.2 | `publish` 经 SFTP 发布到静态 HTTPS 主机，服务端校验后原子切换；秘密路径轮换；生命周期命令（`add`、`promote`、`retire`） |
 | 0.3 | 退役引用发布门禁；把用途分组追加进已有客户端配置，不改变原有默认出口 |
 
