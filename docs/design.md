@@ -91,7 +91,7 @@ canary 批次（`--include-observing`）用于在不影响正式订阅的前提�
 | `validate <清单>` | 0.1 ✅ | 校验清单 | 否 |
 | `plan <清单> [--include-observing] [--json]` | 0.1 ✅ | 显示各客户端的节点名、分组和契约 | 否 |
 | `collect <清单> --out <目录> [--from <目录>]` | 0.1 ✅ | 采集各机器节点片段；来源可插拔：SSH 调用 `frm-node sub fragment`，或读取本地目录；见 3.1 | 是 |
-| `build <清单> --fragments <目录> --out <目录>` | 0.1 | 生成三端 provider 文件、分组片段和契约；名称、顺序、数量不符即失败 | 是 |
+| `build <清单> --fragments <目录> --out <目录>` | 0.1 ✅ | 生成三端 provider 文件、分组片段和契约；名称、顺序、数量不符即失败；见 3.2 | 是 |
 | `diff <旧目录> <新目录>` | 0.1 | 只比较节点名称和数量 | 否 |
 | `publish <目录>` | 0.2 | SFTP 上传批次，服务端校验 SHA-256、大小、数量和结构后原子切换，再经 HTTPS 回读核对 | 是 |
 | `rotate-path` | 0.2 | 新旧秘密路径短暂并存，验证新路径后关闭旧路径，全程不打印路径 | 是 |
@@ -107,6 +107,16 @@ canary 批次（`--include-observing`）用于在不影响正式订阅的前提�
 - 先写到同级隐藏临时目录，全部通过后才替换输出目录；失败时删除临时目录，上一版保持不变。
 - 不符合 `<机器名>-<协议>` 格式的"节点名"不会出现在错误信息里，因为格式错误的行中，等号前的部分可能其实是凭据。
 - 片段上限 1 MiB；SSH 远程命令只由已校验的机器名和客户端名拼成，`--ssh-user` 和 `--remote-command` 也有格式校验。
+
+### 3.2 build 的约定
+
+- 输入必须是 `collect` 的输出：`manifest.json` 的 `kind` 为 `collect`，清单哈希与当前清单一致，`--include-observing` 与采集时一致，每个片段的 SHA-256 与采集记录一致。任何一项不符都要求重新采集。
+- 片段中出现 PEM 私钥或 GitHub token 即拒绝。节点本身的密码、UUID、PSK 属于正常内容。
+- 输出：`providers/` 是纯节点列表（Surge policy-path、Loon 远程节点、Mihomo proxy-provider）；`snippets/` 带 `[Proxy]`/`[Proxy Group]` 或 `proxies:`/`proxy-groups:`，用于粘贴进手写配置；分组类型目前固定为 `select`。
+- 节点顺序以清单为准（机器顺序，再按协议顺序）。
+- 只改名，不重新序列化：Surge/Loon 只替换等号前的名称；Mihomo 只替换每项自己的 `name:` 行，其余行逐字节保留，因为 PyYAML（YAML 1.1）与 Mihomo（YAML 1.2）对 `0123` 这类未加引号的值解析不同。每次改名后解析改名前后的条目，除名称外必须完全相同。只支持块状（block）布局，流式（flow）布局直接拒绝。
+- 写出前把即将写入的内容重新解析，与 `plan` 的节点和分组逐项比对。
+- `manifest.json` 记录契约（数量和有序节点名）、清单哈希、采集记录的哈希和每个输出文件的 SHA-256，供后续 `diff` 和 `publish` 使用。
 
 **0.1 的发布条件**：`collect`、`build`、`diff` 完成并有测试，能用 frm-node 的 `frm sub fragment` 输出端到端生成三端文件。
 

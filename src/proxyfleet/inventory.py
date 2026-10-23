@@ -201,6 +201,9 @@ def parse(data, sha256: str = "") -> Inventory:
         duplicates = sorted({g for g in group_names if group_names.count(g) > 1})
         if duplicates:
             errors.append(f"groups: duplicate group name(s) {', '.join(duplicates)}; give roles distinct labels")
+        for group in group_names:
+            if FORBIDDEN_NODE_CHARS & set(group):
+                errors.append(f"groups: group name {group!r} contains a forbidden character (= , \" \\ or newline)")
 
     lifecycle = data.get("lifecycle") or {}
     if not isinstance(lifecycle, dict):
