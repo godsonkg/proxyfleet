@@ -6,9 +6,9 @@ import argparse
 import json
 import sys
 
-from . import __version__
 from pathlib import Path
 
+from . import __version__
 from .build import BuildError, build
 from .collect import CollectError, DirSource, SshSource, collect
 from .diff import DiffError, compare, format_text, load_build
@@ -186,8 +186,9 @@ def main(argv=None) -> int:
                      help="build the canary (the collection must also include observing machines)")
     bld.set_defaults(func=cmd_build)
 
-    dif = sub.add_parser("diff", help="compare two builds by node names, counts and groups",
-                         description="Compare two build outputs. Reads only manifest.json, never node details. "
+    dif = sub.add_parser("diff", help="compare two builds by nodes, groups and node details",
+                         description="Compare two build outputs. Node details are compared locally; "
+                                     "only node and group names are printed. "
                                      "Exit status: 0 no changes, 1 changes, 2 error.")
     dif.add_argument("old", help="previous build output (may not exist yet)")
     dif.add_argument("new", help="new build output")
