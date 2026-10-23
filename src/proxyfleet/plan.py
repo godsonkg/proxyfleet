@@ -70,7 +70,7 @@ def contract(inventory: Inventory, include_observing: bool = False) -> dict:
     }
 
 
-def _groups(inventory: Inventory, client: str, include_observing: bool) -> dict[str, list[str]]:
+def client_groups(inventory: Inventory, client: str, include_observing: bool) -> dict[str, list[str]]:
     nodes = node_names(inventory, client, include_observing)
     fleet = {inventory.fleet_group: nodes} if nodes else {}
     return {**fleet, **role_groups(inventory, client)}
@@ -82,7 +82,7 @@ def build_plan(inventory: Inventory, include_observing: bool = False) -> dict:
         "clients": {
             client: {
                 "nodes": node_names(inventory, client, include_observing),
-                "groups": _groups(inventory, client, include_observing),
+                "groups": client_groups(inventory, client, include_observing),
             }
             for client in inventory.clients
         },

@@ -7,7 +7,7 @@
 
 Manage a fleet of self-hosted proxy servers from one inventory file, and plan the Surge, Loon and Mihomo (Clash Meta) subscriptions that go with it.
 
-> **Status: early development (0.1.0.dev0).** `validate`, `plan` and `collect` work today. Building subscription files and publishing are next; see [the design](docs/design.md) (Chinese).
+> **Status: early development (0.1.0.dev0).** `validate`, `plan`, `collect` and `build` work today. Comparing builds and publishing are next; see [the design](docs/design.md) (Chinese).
 
 ## Why
 
@@ -88,11 +88,36 @@ proxyfleet collect ~/private/fleet.yaml --out ~/private/collected --from ~/priva
 - SSH runs in batch mode with a 10-second connect timeout and up to 3 attempts per fragment. Use `--ssh-option` for extra ssh arguments, such as a port.
 - Errors name the machine, the client and the node names at fault, never the fragment contents.
 
+### Building subscription files
+
+`build` turns a collection into files for each client:
+
+```bash
+proxyfleet build ~/private/fleet.yaml --fragments ~/private/collected --out ~/private/built
+```
+
+```text
+built/
+  providers/surge.txt     node list for Surge policy-path
+  providers/loon.txt      node list for a Loon remote proxy subscription (not yet tested on a device)
+  providers/mihomo.yaml   proxies: list for a Mihomo proxy-provider
+  snippets/surge.conf     [Proxy] + [Proxy Group] to paste into a hand-written Surge profile
+  snippets/loon.conf      the same for Loon
+  snippets/mihomo.yaml    proxies: + proxy-groups: for Mihomo
+  manifest.json           contract (node names, order, counts), inventory SHA-256, file hashes
+```
+
+- Nodes are renamed with your naming templates and ordered as in the inventory, whatever order the servers returned them in.
+- The collection must come from the **same inventory file** (by SHA-256) and no fragment may have changed since it was collected; otherwise run `collect` again.
+- Fragments containing a PEM private key or a GitHub token are rejected.
+- Only the name of each node is changed. Every other line is kept byte for byte, and each Mihomo rename is verified by parsing the item before and after.
+- Before replacing `--out`, the result is re-read and compared with `plan`. As with `collect`, a failed build leaves the previous output untouched.
+
 ## Roadmap
 
 | Version | Scope |
 |---|---|
-| 0.1 | `validate`, `plan`, `collect` (done); `build` Surge/Loon/Mihomo provider files, role groups and the contract; `diff` against the last build (names and counts only) |
+| 0.1 | `validate`, `plan`, `collect`, `build` (done); `diff` against the last build (names and counts only) |
 | 0.2 | `publish` to a static HTTPS host over SFTP with server-side verification and atomic switch; secret path rotation; lifecycle commands (`add`, `promote`, `retire`) |
 | 0.3 | Release gates for retired references; append role groups into existing client configs without changing their defaults |
 

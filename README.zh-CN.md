@@ -7,7 +7,7 @@
 
 用一份清单文件管理多台自建代理服务器，并规划配套的 Surge、Loon、Mihomo（Clash Meta）订阅。
 
-> **状态：早期开发（0.1.0.dev0）。** 目前可用 `validate`、`plan` 和 `collect`；生成订阅文件和发布是下一步，见 [设计文档](docs/design.md)。
+> **状态：早期开发（0.1.0.dev0）。** 目前可用 `validate`、`plan`、`collect` 和 `build`；版本比较和发布是下一步，见 [设计文档](docs/design.md)。
 
 ## 解决什么问题
 
@@ -73,11 +73,36 @@ proxyfleet collect ~/private/fleet.yaml --out ~/private/collected --from ~/priva
 - SSH 使用批处理模式，连接超时 10 秒，每个片段最多尝试 3 次；额外的 ssh 参数（如端口）用 `--ssh-option` 传入。
 - 错误只指出机器、客户端和出错的节点名，不回显片段内容。
 
+### 生成订阅文件
+
+`build` 把采集结果生成为各客户端的文件：
+
+```bash
+proxyfleet build ~/private/fleet.yaml --fragments ~/private/collected --out ~/private/built
+```
+
+```text
+built/
+  providers/surge.txt     Surge policy-path 用的节点列表
+  providers/loon.txt      Loon 远程节点订阅用的节点列表（尚未实机导入验证）
+  providers/mihomo.yaml   Mihomo proxy-provider 用的 proxies: 列表
+  snippets/surge.conf     [Proxy] + [Proxy Group]，可粘贴进手写的 Surge 配置
+  snippets/loon.conf      Loon 版本
+  snippets/mihomo.yaml    Mihomo 的 proxies: + proxy-groups:
+  manifest.json           契约（节点名、顺序、数量）、清单 SHA-256、各文件哈希
+```
+
+- 节点按命名模板改名，并按清单中的顺序排列，与服务器返回的顺序无关。
+- 采集结果必须来自**同一份清单文件**（按 SHA-256 比对），且采集后片段没有被改动过，否则需要重新 `collect`。
+- 含 PEM 私钥或 GitHub token 的片段会被拒绝。
+- 只修改每个节点的名称，其余每一行原样保留；Mihomo 的每次改名都会在改名前后各解析一次进行核对。
+- 替换 `--out` 之前会重新读取结果并与 `plan` 比对。和 `collect` 一样，失败时上一版输出保持不变。
+
 ## 路线图
 
 | 版本 | 范围 |
 |---|---|
-| 0.1 | `validate`、`plan`、`collect`（已完成）；`build` 生成三端 provider 文件、用途分组和契约；`diff` 与上一版比较（只显示名称和数量） |
+| 0.1 | `validate`、`plan`、`collect`、`build`（已完成）；`diff` 与上一版比较（只显示名称和数量） |
 | 0.2 | `publish` 经 SFTP 发布到静态 HTTPS 主机，服务端校验后原子切换；秘密路径轮换；生命周期命令（`add`、`promote`、`retire`） |
 | 0.3 | 退役引用发布门禁；把用途分组追加进已有客户端配置，不改变原有默认出口 |
 

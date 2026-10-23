@@ -9,6 +9,7 @@ import sys
 from . import __version__
 from pathlib import Path
 
+from .build import BuildError, build
 from .collect import CollectError, DirSource, SshSource, collect
 from .fsutil import OutputError
 from .inventory import InventoryError, load
@@ -100,6 +101,29 @@ def cmd_collect(args) -> int:
     return EXIT_OK
 
 
+def cmd_build(args) -> int:
+    inventory = _load(args.inventory)
+    if inventory is None:
+        return EXIT_INVALID
+    try:
+        manifest = build(inventory, Path(args.fragments), Path(args.out), include_observing=args.include_observing)
+    except BuildError as error:
+        print(f"error: build failed; {args.out} was not changed:", file=sys.stderr)
+        for line in error.failures:
+            print(f"  - {line}", file=sys.stderr)
+        return EXIT_INVALID
+    except OutputError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return EXIT_INVALID
+    counts = ", ".join(f"{client} {count}" for client, count in manifest["contract"]["counts"].items())
+    print(f"built {args.out}: {counts} nodes")
+    for relative in manifest["files"]:
+        print(f"  {relative}")
+    print("warning: these files contain node credentials; keep them out of Git, cloud drives and chats",
+          file=sys.stderr)
+    return EXIT_OK
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="proxyfleet",
@@ -133,6 +157,14 @@ def main(argv=None) -> int:
     col.add_argument("--attempts", type=int, default=3, choices=range(1, 6), metavar="1-5",
                      help="SSH attempts per fragment")
     col.set_defaults(func=cmd_collect)
+
+    bld = sub.add_parser("build", help="turn a collection into Surge, Loon and Mihomo files")
+    bld.add_argument("inventory", help="path to fleet.yaml")
+    bld.add_argument("--fragments", required=True, metavar="DIR", help="output directory of `collect`")
+    bld.add_argument("--out", required=True, help="output directory (replaced only if the build succeeds)")
+    bld.add_argument("--include-observing", action="store_true",
+                     help="build the canary (the collection must also include observing machines)")
+    bld.set_defaults(func=cmd_build)
 
     try:
         args = parser.parse_args(argv)
