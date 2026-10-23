@@ -175,15 +175,14 @@ def publish(build_dir: Path, config: PublishConfig, *, verify_timeout: float = 9
     make_private_dir(staging)
     try:
         order = _write_batch(staging, build_dir, manifest, clients, batch)
-        if '"' in str(staging):
-            raise PublishError("temporary directory path contains a double quote")
+        # sftp runs inside the staging directory, so the batch file holds only
+        # ASCII batch names and never a local path (which may be non-ASCII on Windows).
         batch_file = staging / "sftp.batch"
-        lines = [f'lcd "{staging}"', *[f"put {name}" for name in order]]
-        write_private(batch_file, ("\n".join(lines) + "\n").encode())
+        write_private(batch_file, "".join(f"put {name}\n" for name in order).encode())
 
         progress(f"uploading batch {batch}")
         try:
-            result = runner(sftp_command(config, batch_file), stdin=subprocess.DEVNULL,
+            result = runner(sftp_command(config, batch_file), cwd=staging, stdin=subprocess.DEVNULL,
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=120, check=False)
         except FileNotFoundError:
             raise PublishError("sftp not found on PATH") from None

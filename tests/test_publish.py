@@ -42,11 +42,13 @@ class FakeSftp:
         self.commands.append(command)
         if self.exit_code:
             return subprocess.CompletedProcess(command, self.exit_code)
-        lines = Path(command[command.index("-b") + 1]).read_text().splitlines()
-        local = Path(lines[0][len('lcd "'):-1])
+        batch_file = Path(command[command.index("-b") + 1])
+        lines = batch_file.read_bytes().decode("ascii").splitlines()
+        local = Path(kwargs["cwd"])
         self.inbox.mkdir(parents=True, exist_ok=True)
-        for line in lines[1:]:
-            name = line.split()[1]
+        for line in lines:
+            verb, name = line.split()
+            assert verb == "put" and "/" not in name and "\\" not in name
             shutil.copy(local / name, self.inbox / name)
             self.order.append(name)
         if self.after_upload:
@@ -165,7 +167,7 @@ def test_upload_order_and_batch_contents(tmp_path, built):
     contract = (inbox / f"{batch}.contract.env").read_text()
     assert contract.splitlines() == [
         "PF_CONTRACT_VERSION=1", "PF_CLIENTS=surge,loon,mihomo",
-        f"PF_INVENTORY_SHA256={yaml.safe_load((built / 'manifest.json').read_text())['inventory_sha256']}",
+        f"PF_INVENTORY_SHA256={yaml.safe_load((built / 'manifest.json').read_text(encoding='utf-8'))['inventory_sha256']}",
         "PF_SURGE_COUNT=4", "PF_LOON_COUNT=4", "PF_MIHOMO_COUNT=4"]
     for line in (inbox / f"{batch}.sha256").read_text().splitlines():
         digest, name = line.split("  ")
