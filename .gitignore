@@ -1,0 +1,10 @@
+__pycache__/
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+.venv/
+# Real inventories and generated output never belong in this repository.
+fleet.yaml
+fleet.json
+output/
