@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "proxyfleet"
+dynamic = ["version"]
+description = "Manage a fleet of self-hosted proxy servers and plan Surge, Loon and Mihomo subscriptions"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.9"
+dependencies = ["PyYAML>=6.0"]
+classifiers = [
+  "Environment :: Console",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Topic :: Internet :: Proxy Servers",
+  "Topic :: System :: Systems Administration",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.scripts]
+proxyfleet = "proxyfleet.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/godsonkg/proxyfleet"
+
+[tool.setuptools.dynamic]
+version = {attr = "proxyfleet.__version__"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

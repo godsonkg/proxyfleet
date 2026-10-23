@@ -1,0 +1,82 @@
+# proxyfleet inventory example. All addresses are RFC 5737 documentation IPs.
+# Copy this file outside any public repository before filling in real hosts.
+version: 1
+
+# Clients to plan for. Each machine lists its protocols per client.
+clients: [surge, loon, mihomo]
+
+# Node name templates. Placeholders: {flag} {name} {protocol} {country}.
+# {name} and {protocol} are required. Per-client entries override "default".
+naming:
+  default: "{flag} {name}-{protocol}"
+  loon: "🛠️ {name}-{protocol}"
+
+# Group names. "fleet" holds every node in the batch; "role" is used for each role.
+groups:
+  fleet: "🛰️ Fleet"
+  role: "🛰️ Fleet-{role}"
+
+# Roles are usage tags. A machine joins a role only if it allows it explicitly.
+# "protocols" and "countries" further restrict which nodes count for that role.
+roles:
+  general: {}
+  ai:
+    label: AI
+    protocols: [AnyTLS, Reality, Snell-v6]
+    countries: [US]
+  google:
+    protocols: [AnyTLS, Reality, Snell-v6]
+  telegram: {}
+  streaming: {}
+
+lifecycle:
+  observing:
+    # New machines start as "observing" and may never allow these roles.
+    deny_roles: [ai, google]
+
+machines:
+  - name: US-WEST
+    host: 203.0.113.10
+    country: US
+    state: active
+    protocols:
+      surge: [AnyTLS, Snell-v6]
+      loon: [AnyTLS, Reality]
+      mihomo: [AnyTLS, Reality]
+    roles:
+      allow: [general, ai, google]
+
+  - name: JP-TYO
+    host: 198.51.100.20
+    country: JP
+    state: active
+    protocols:
+      surge: [AnyTLS, Hysteria2]
+      loon: [AnyTLS, Hysteria2]
+      mihomo: [AnyTLS, Hysteria2]
+    roles:
+      allow: [general, telegram, streaming]
+      deny: [ai, google]
+
+  - name: US-NEW
+    host: 192.0.2.30
+    country: US
+    state: observing
+    protocols:
+      surge: [AnyTLS]
+      loon: [AnyTLS]
+      mihomo: [AnyTLS]
+    roles:
+      allow: [general]
+
+  - name: HK-OLD
+    host: 192.0.2.40
+    country: HK
+    state: retired
+    protocols:
+      surge: [AnyTLS]
+      loon: [AnyTLS]
+      mihomo: [AnyTLS]
+
+# Node names from machines removed from this file that must never reappear.
+retired_names: []
