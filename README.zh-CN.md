@@ -55,6 +55,24 @@ proxyfleet plan ~/private/fleet.yaml --json
 
 `plan` 按客户端列出有序的节点名称、组成的分组和契约数量。所有选项及注释见 [`examples/fleet.example.yaml`](examples/fleet.example.yaml)。
 
+### 管理机器
+
+不用手工编辑 `fleet.yaml` 就能修改机器，注释和格式都会保留，只改动相关的行：
+
+```bash
+proxyfleet machine list    ~/private/fleet.yaml
+proxyfleet machine add     ~/private/fleet.yaml SG-NEW --host 192.0.2.50 --country SG --discover --ssh-user root --allow general
+proxyfleet machine promote ~/private/fleet.yaml SG-NEW --allow telegram
+proxyfleet machine disable ~/private/fleet.yaml JP-TYO     # 用 enable 恢复
+proxyfleet machine retire  ~/private/fleet.yaml HK-OLD     # 永久生效，会先确认
+proxyfleet machine set-host ~/private/fleet.yaml JP-TYO 198.51.100.21
+```
+
+- `add` 新增的机器一律是 **observing** 状态。`--discover` 通过 SSH 调用服务器上的 `frm-node sub fragment`，自动识别各客户端支持的协议；不用它时，用 `--protocol surge=AnyTLS,Snell-v6` 手动列出。
+- 每个命令都会显示**正式发布**的节点列表和分组会怎么变；加 `--dry-run` 只显示、不写入。
+- 每次修改都会先按完整清单校验，再原子写入并保留文件权限。会让清单失效的修改（比如地址重复）不会写入。
+- 如果你的文件格式无法原样保留，proxyfleet 会拒绝修改，而不是重新排版整个文件。
+
 ### 采集节点片段
 
 `collect` 采集每台启用机器的节点片段，并检查每个片段是否恰好包含清单期望的节点（命名为 `<机器名>-<协议>`）：
@@ -165,7 +183,7 @@ proxyfleet rotate-path --admin me # 用有免密 sudo 的用户代替 root
 | 版本 | 范围 |
 |---|---|
 | 0.1 | `validate`、`plan`、`collect`、`build`、`diff`（已完成） |
-| 0.2 | `publish` 经 SFTP 发布到静态 HTTPS 主机，服务端校验后原子切换、秘密路径轮换（已完成，尚未发布）；生命周期命令（`add`、`promote`、`retire`） |
+| 0.2 | `publish` 经 SFTP 发布到静态 HTTPS 主机，服务端校验后原子切换、秘密路径轮换、生命周期命令（`machine add`、`promote`、`disable`、`enable`、`retire`、`set-host`）（已完成，尚未发布） |
 | 0.3 | 退役引用发布门禁；把用途分组追加进已有客户端配置，不改变原有默认出口 |
 
 ## 安全

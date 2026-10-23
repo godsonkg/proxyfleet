@@ -70,6 +70,24 @@ proxyfleet plan ~/private/fleet.yaml --json
 
 See [`examples/fleet.example.yaml`](examples/fleet.example.yaml) for every option, with comments.
 
+### Managing machines
+
+Change machines without hand-editing `fleet.yaml`. Comments and layout are kept, and only the affected lines change:
+
+```bash
+proxyfleet machine list    ~/private/fleet.yaml
+proxyfleet machine add     ~/private/fleet.yaml SG-NEW --host 192.0.2.50 --country SG --discover --ssh-user root --allow general
+proxyfleet machine promote ~/private/fleet.yaml SG-NEW --allow telegram
+proxyfleet machine disable ~/private/fleet.yaml JP-TYO     # enable brings it back
+proxyfleet machine retire  ~/private/fleet.yaml HK-OLD     # permanent; asks first
+proxyfleet machine set-host ~/private/fleet.yaml JP-TYO 198.51.100.21
+```
+
+- `add` always creates an **observing** machine. `--discover` asks the server which protocols each client gets (`frm-node sub fragment` over SSH); without it, list them with `--protocol surge=AnyTLS,Snell-v6`.
+- Each command prints what changes in the **published** node lists and groups. `--dry-run` shows that without writing anything.
+- Each edit is validated as a whole inventory before it is written (atomically, keeping file permissions). An edit that would make the inventory invalid, such as a duplicate host, writes nothing.
+- If your file's layout cannot be reproduced exactly, proxyfleet refuses to edit it rather than reformat it.
+
 ### Collecting node fragments
 
 `collect` fetches each enabled machine's node fragments and checks that every fragment contains exactly the nodes the inventory expects, named `<machine>-<protocol>`:
@@ -180,7 +198,7 @@ If anything fails before step 3, the server is rolled back and `publish.yaml` re
 | Version | Scope |
 |---|---|
 | 0.1 | `validate`, `plan`, `collect`, `build`, `diff` (done) |
-| 0.2 | `publish` to a static HTTPS host over SFTP with server-side verification and atomic switch, secret path rotation (done, unreleased); lifecycle commands (`add`, `promote`, `retire`) |
+| 0.2 | `publish` to a static HTTPS host over SFTP with server-side verification and atomic switch, secret path rotation and lifecycle commands (`machine add`, `promote`, `disable`, `enable`, `retire`, `set-host`) (done, unreleased) |
 | 0.3 | Release gates for retired references; append role groups into existing client configs without changing their defaults |
 
 ## Security

@@ -1,4 +1,4 @@
-"""Command line interface: `proxyfleet validate` and `proxyfleet plan`."""
+"""Command line interface for proxyfleet."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import sys
 
 from pathlib import Path
 
-from . import __version__
+from . import __version__, lifecycle
 from .build import BuildError, build
 from .collect import CollectError, DirSource, SshSource, collect
 from .diff import DiffError, compare, format_text, load_build
@@ -165,6 +165,16 @@ def cmd_publish(args) -> int:
     return EXIT_OK
 
 
+def _confirm(question: str) -> bool | None:
+    """True/False from the user, or None when there is no one to ask."""
+    if not sys.stdin.isatty():
+        return None
+    try:
+        return input(f"{question} [y/N] ").strip().lower() in ("y", "yes")
+    except EOFError:  # Windows reports the NUL device as a terminal.
+        return None
+
+
 def cmd_rotate_path(args) -> int:
     config_path = Path(args.config) if args.config else default_config_path()
     try:
@@ -173,18 +183,12 @@ def cmd_rotate_path(args) -> int:
             print("rolled back: the server serves the path in your publish config only")
             return EXIT_OK
         if not args.yes:
-            answer = None
-            if sys.stdin.isatty():
-                try:
-                    answer = input("Rotate the subscription path? Every client must then be given the new URL. [y/N] ")
-                except EOFError:
-                    # Windows reports the NUL device as a terminal.
-                    answer = None
+            answer = _confirm("Rotate the subscription path? Every client must then be given the new URL.")
             if answer is None:
                 print("error: rotating breaks every client's current subscription URL; "
                       "pass --yes to confirm", file=sys.stderr)
                 return EXIT_USAGE
-            if answer.strip().lower() not in ("y", "yes"):
+            if not answer:
                 print("cancelled; nothing was changed")
                 return EXIT_OK
         result = rotate(config_path, admin=args.admin, ssh_options=args.ssh_option, timeout=args.timeout,
@@ -194,6 +198,78 @@ def cmd_rotate_path(args) -> int:
         return EXIT_INVALID
     print(f"rotated: {', '.join(result['files'])} now served only under the new path; the old one returns 404")
     print(f"the new URL is in {config_path}; give it to every client (it is not printed here)")
+    return EXIT_OK
+
+
+def cmd_machine_list(args) -> int:
+    inventory = _load(args.inventory)
+    if inventory is None:
+        return EXIT_INVALID
+    clients = list(inventory.clients)
+    rows = [["NAME", "HOST", "CC", "STATE", *[c.upper() for c in clients], "ROLES"]]
+    for m in inventory.machines:
+        rows.append([m.name, m.host, m.country, m.state, *[str(len(m.protocols[c])) for c in clients],
+                     ",".join(m.allow) or "-"])
+    widths = [max(len(row[i]) for row in rows) for i in range(len(rows[0]))]
+    for row in rows:
+        print("  ".join(cell.ljust(width) for cell, width in zip(row, widths)).rstrip())
+    return EXIT_OK
+
+
+def cmd_machine_change(args) -> int:
+    path = Path(args.inventory)
+    try:
+        if args.action == "add":
+            if bool(args.discover) == bool(args.protocol):
+                print("error: give either --discover or at least one --protocol CLIENT=P1,P2", file=sys.stderr)
+                return EXIT_USAGE
+            if args.discover:
+                inventory = load(path)
+                source = SshSource(user=args.ssh_user, options=args.ssh_option, remote_command=args.remote_command)
+                protocols = lifecycle.discover_protocols(source, args.name, args.host, inventory.clients)
+            else:
+                protocols = {}
+                for spec in args.protocol:
+                    client, sep, values = spec.partition("=")
+                    if not sep:
+                        print(f"error: --protocol must look like CLIENT=P1,P2, got {spec!r}", file=sys.stderr)
+                        return EXIT_USAGE
+                    protocols[client.strip()] = [v.strip() for v in values.split(",") if v.strip()]
+            change = lifecycle.add(path, args.name, args.host, args.country, protocols, args.allow, args.deny)
+        elif args.action == "promote":
+            change = lifecycle.promote(path, args.name, args.allow)
+        elif args.action == "disable":
+            change = lifecycle.disable(path, args.name)
+        elif args.action == "enable":
+            change = lifecycle.enable(path, args.name, observing=args.observing)
+        elif args.action == "retire":
+            change = lifecycle.retire(path, args.name)
+        else:
+            change = lifecycle.set_host(path, args.name, args.new_host)
+    except (lifecycle.LifecycleError, InventoryError, ValueError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        for line in getattr(error, "details", None) or getattr(error, "errors", []):
+            print(f"  - {line}", file=sys.stderr)
+        return EXIT_INVALID
+    for line in lifecycle.describe(change):
+        print(line)
+    if args.dry_run:
+        print("dry run: nothing was written")
+        return EXIT_OK
+    if args.action == "retire" and not args.yes:
+        answer = _confirm(f"Retire {args.name}? Its names can never be reused.")
+        if answer is None:
+            print("error: retiring is permanent; pass --yes to confirm", file=sys.stderr)
+            return EXIT_USAGE
+        if not answer:
+            print("cancelled; nothing was written")
+            return EXIT_OK
+    lifecycle.save(path, change)
+    print(f"updated {path}")
+    if args.action == "add":
+        print("next: collect and build with --include-observing to test it as a canary, then `machine promote`")
+    elif change.before.machines != change.after.machines:
+        print("next: collect, build, diff and publish to put the change live")
     return EXIT_OK
 
 
@@ -268,6 +344,43 @@ def main(argv=None) -> int:
     rot.add_argument("--yes", action="store_true", help="do not ask for confirmation")
     rot.add_argument("--rollback", action="store_true", help="undo an interrupted rotation")
     rot.set_defaults(func=cmd_rotate_path)
+
+    mac = sub.add_parser("machine", help="add, promote, disable, enable, retire or re-address machines")
+    mac_sub = mac.add_subparsers(dest="action", required=True)
+    lst = mac_sub.add_parser("list", help="list machines")
+    lst.add_argument("inventory", help="path to fleet.yaml")
+    lst.set_defaults(func=cmd_machine_list)
+
+    def change_parser(name, help_text):
+        p = mac_sub.add_parser(name, help=help_text)
+        p.add_argument("inventory", help="path to fleet.yaml")
+        p.add_argument("name", help="machine name")
+        p.add_argument("--dry-run", action="store_true", help="show the change without writing it")
+        p.set_defaults(func=cmd_machine_change)
+        return p
+
+    add = change_parser("add", "add a machine in the observing state")
+    add.add_argument("--host", required=True, help="IP address or host name")
+    add.add_argument("--country", required=True, help="ISO 3166-1 alpha-2 code, e.g. US")
+    add.add_argument("--protocol", action="append", default=[], metavar="CLIENT=P1,P2",
+                     help="protocols per client, repeatable, e.g. surge=AnyTLS,Snell-v6")
+    add.add_argument("--discover", action="store_true",
+                     help="ask the machine over SSH (`frm-node sub fragment`) instead of --protocol")
+    add.add_argument("--ssh-user", help="SSH user for --discover")
+    add.add_argument("--ssh-option", action="append", default=[], metavar="OPT", help="extra ssh argument")
+    add.add_argument("--remote-command", default="frm-node", help="frm-node command on the server")
+    add.add_argument("--allow", action="append", default=[], metavar="ROLE", help="role to allow, repeatable")
+    add.add_argument("--deny", action="append", default=[], metavar="ROLE", help="role to deny, repeatable")
+    pro = change_parser("promote", "make an observing machine active")
+    pro.add_argument("--allow", action="append", default=[], metavar="ROLE",
+                     help="also allow this role (removes it from deny), repeatable")
+    change_parser("disable", "stop publishing a machine for now")
+    ena = change_parser("enable", "publish a disabled machine again")
+    ena.add_argument("--observing", action="store_true", help="re-enable as observing instead of active")
+    ret = change_parser("retire", "remove a machine for good; its names can never be reused")
+    ret.add_argument("--yes", action="store_true", help="do not ask for confirmation")
+    host = change_parser("set-host", "change a machine's IP address or host name")
+    host.add_argument("new_host", help="new IP address or host name")
 
     try:
         args = parser.parse_args(argv)

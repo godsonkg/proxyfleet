@@ -336,7 +336,11 @@ def _check_node_names(inventory: Inventory) -> None:
 
 
 def load(path: str | Path) -> Inventory:
-    raw = Path(path).read_bytes()
+    return loads(Path(path).read_bytes(), str(path))
+
+
+def loads(raw: bytes, path: str = "inventory") -> Inventory:
+    """Parse and validate inventory bytes; `path` only labels error messages."""
     try:
         data = yaml.load(raw.decode("utf-8"), Loader=_UniqueKeyLoader)
     except UnicodeDecodeError:

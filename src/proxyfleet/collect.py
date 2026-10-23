@@ -90,7 +90,9 @@ class SshSource:
         return ["ssh", "-n", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
                 *self.options, "--", target, remote]
 
-    def fetch(self, machine: Machine, client: str) -> bytes:
+    def fetch(self, machine: Machine, client: str, allow_empty: bool = False) -> bytes:
+        """Fragment bytes. Empty output counts as a failure unless `allow_empty`
+        (frm-node prints nothing for a client none of its protocols support)."""
         reason = "no attempt made"
         for attempt in range(1, self.attempts + 1):
             try:
@@ -101,7 +103,7 @@ class SshSource:
             except FileNotFoundError:
                 raise SourceError("ssh not found on PATH") from None
             else:
-                if result.returncode == 0 and result.stdout.strip():
+                if result.returncode == 0 and (allow_empty or result.stdout.strip()):
                     if len(result.stdout) > MAX_FRAGMENT_BYTES:
                         raise SourceError("fragment larger than 1 MiB")
                     return result.stdout
