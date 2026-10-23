@@ -7,7 +7,7 @@
 
 Manage a fleet of self-hosted proxy servers from one inventory file, and plan the Surge, Loon and Mihomo (Clash Meta) subscriptions that go with it.
 
-> **Status: early development (0.1.0.dev0).** `validate` and `plan` work today. Collecting nodes, building subscription files and publishing are next; see [the design](docs/design.md) (Chinese).
+> **Status: early development (0.1.0.dev0).** `validate`, `plan` and `collect` work today. Building subscription files and publishing are next; see [the design](docs/design.md) (Chinese).
 
 ## Why
 
@@ -70,11 +70,29 @@ proxyfleet plan ~/private/fleet.yaml --json
 
 See [`examples/fleet.example.yaml`](examples/fleet.example.yaml) for every option, with comments.
 
+### Collecting node fragments
+
+`collect` fetches each enabled machine's node fragments and checks that every fragment contains exactly the nodes the inventory expects, named `<machine>-<protocol>`:
+
+```bash
+# Over SSH, running `frm-node sub fragment` on each server (needs root there)
+proxyfleet collect ~/private/fleet.yaml --out ~/private/collected --ssh-user root
+
+# Or from fragments you already have: <DIR>/<machine>/surge.txt, loon.txt, mihomo.yaml
+proxyfleet collect ~/private/fleet.yaml --out ~/private/collected --from ~/private/fragments
+```
+
+- Every fragment must pass, or **nothing is written** and the previous output stays as it was. All failures are listed together.
+- The output directory and files are readable only by you (`0700`/`0600` on Unix, a current-user ACL on Windows).
+- An existing `--out` directory is replaced only if it is empty or a previous proxyfleet output, so pointing it at the wrong folder cannot delete your files.
+- SSH runs in batch mode with a 10-second connect timeout and up to 3 attempts per fragment. Use `--ssh-option` for extra ssh arguments, such as a port.
+- Errors name the machine, the client and the node names at fault, never the fragment contents.
+
 ## Roadmap
 
 | Version | Scope |
 |---|---|
-| 0.1 | `validate`, `plan` (done); `collect` node fragments over SSH or from a local directory; `build` Surge/Loon/Mihomo provider files, role groups and the contract; `diff` against the last build (names and counts only) |
+| 0.1 | `validate`, `plan`, `collect` (done); `build` Surge/Loon/Mihomo provider files, role groups and the contract; `diff` against the last build (names and counts only) |
 | 0.2 | `publish` to a static HTTPS host over SFTP with server-side verification and atomic switch; secret path rotation; lifecycle commands (`add`, `promote`, `retire`) |
 | 0.3 | Release gates for retired references; append role groups into existing client configs without changing their defaults |
 
