@@ -1,0 +1,12 @@
+# proxyfleet publish config. It contains the secret subscription path:
+# keep it outside any repository and readable only by you (chmod 600).
+# Default location: ~/.config/proxyfleet/publish.yaml (Windows: %APPDATA%\proxyfleet\publish.yaml)
+
+# SFTP host and account created by server/setup.sh
+host: sub.example.com
+user: proxyfleet
+# port: 22
+# identity_file: ~/.ssh/proxyfleet-upload
+
+# https://<PF_DOMAIN>/<64 hex characters from /etc/proxyfleet/path-token>
+base_url: https://sub.example.com/0000000000000000000000000000000000000000000000000000000000000000

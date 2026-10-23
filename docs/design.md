@@ -93,7 +93,7 @@ canary 批次（`--include-observing`）用于在不影响正式订阅的前提�
 | `collect <清单> --out <目录> [--from <目录>]` | 0.1 ✅ | 采集各机器节点片段；来源可插拔：SSH 调用 `frm-node sub fragment`，或读取本地目录；见 3.1 | 是 |
 | `build <清单> --fragments <目录> --out <目录>` | 0.1 ✅ | 生成三端 provider 文件、分组片段和契约；名称、顺序、数量不符即失败；见 3.2 | 是 |
 | `diff <旧目录> <新目录> [--json]` | 0.1 ✅ | 比较节点名、顺序、数量、分组成员和节点详情；只显示节点名；见 3.3 | 本地读取，不显示 |
-| `publish <目录>` | 0.2 | SFTP 上传批次，服务端校验 SHA-256、大小、数量和结构后原子切换，再经 HTTPS 回读核对 | 是 |
+| `publish <生成目录> [--config] [--dry-run]` | 0.2 ✅ | SFTP 上传批次，服务端校验 SHA-256、大小、数量和结构后原子切换，再经 HTTPS 回读核对；见 3.4 | 是 |
 | `rotate-path` | 0.2 | 新旧秘密路径短暂并存，验证新路径后关闭旧路径，全程不打印路径 | 是 |
 | `add` / `promote` / `disable` / `retire` | 0.2 | 修改清单中的机器状态；`add` 可经 SSH 自动发现协议 | 否 |
 | `gate` | 0.3 | 退役引用与秘密泄露门禁，用于任意客户端配置 | 是 |
@@ -125,6 +125,23 @@ canary 批次（`--include-observing`）用于在不影响正式订阅的前提�
 - 详情只在本地比较，输出（含 `--json`）只包含节点名和分组名，不包含任何节点详情。
 - 清单哈希不同时提示 `inventory: changed`；一边是 canary、一边不是时给出警告。
 - 退出码沿用 `diff(1)`：0 无变化，1 有变化，2 出错，方便脚本判断。
+
+### 3.4 publish 的约定
+
+**客户端**
+- 只发布 `build` 的输出，且文件哈希与 manifest 一致；拒绝 canary 和节点数为 0 的客户端。
+- 配置 `publish.yaml` 含秘密路径：未知字段拒绝；`base_url` 必须是 `https://<主机>/<64 位小写十六进制>`；Unix 上文件权限必须为仅本人可读；任何错误信息都不回显 `base_url`。
+- 批次名 `YYYYMMDDTHHMMSSZ-<12 位十六进制>`，文件依次为各客户端文件、`contract.env`、`.sha256`，最后是 `.ready`。暂存目录私有，结束后删除。
+- `contract.env` 为 `KEY=VALUE`：`PF_CONTRACT_VERSION`、`PF_CLIENTS`、`PF_INVENTORY_SHA256` 和每个客户端的 `PF_<CLIENT>_COUNT`，便于服务端只用 bash/awk 解析。
+- 上传后轮询 HTTPS（默认 90 秒），每个文件的 SHA-256 一致才算成功；失败信息只含文件名和原因（如 `HTTP 404`）。
+
+**服务端**（`server/setup.sh`、`server/proxyfleet-publish.sh`）
+- 上传账号只能 SFTP，chroot 到 `/srv/proxyfleet/sftp/proxyfleet`，只能写 `upload/`。
+- systemd 定时器每 20 秒运行发布脚本，`flock` 防止并发，每次只处理一个带 `.ready` 的批次。
+- 校验顺序：批次名格式、控制文件大小、契约格式和键、清单逐行、文件存在且非符号链接、大小上限 1 MiB、`sha256sum -c`、每个客户端的结构和节点数。任何一步失败都标记为 `.failed`，线上不变。
+- 通过后写入新的 release 目录，`ln -s` + `mv -T` 原子切换 `current`；保留最近 5 个 release，失败残留 7 天后清理。
+- Caddy：写入 `/etc/caddy/proxyfleet.caddy` 并在 Caddyfile 中 import；若 Caddyfile 只是安装包自带的欢迎页则替换，否则追加；`caddy validate` 失败即还原备份。站点只放行三个订阅文件路径。
+- 秘密路径在 `/etc/proxyfleet/path-token`，安装脚本不打印它，只提示用 `sudo cat` 读取一次。
 
 **0.1 的发布条件**（已于 0.1.0 满足）：`collect`、`build`、`diff` 完成并有测试，能用 frm-node 的 `frm sub fragment` 输出端到端生成三端文件。
 
