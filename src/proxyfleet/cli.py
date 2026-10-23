@@ -11,6 +11,7 @@ from pathlib import Path
 
 from .build import BuildError, build
 from .collect import CollectError, DirSource, SshSource, collect
+from .diff import DiffError, compare, format_text, load_build
 from .fsutil import OutputError
 from .inventory import InventoryError, load
 from .plan import build_plan
@@ -124,6 +125,25 @@ def cmd_build(args) -> int:
     return EXIT_OK
 
 
+def cmd_diff(args) -> int:
+    """Exit 0 when nothing changed, 1 when something did, 2 on errors (like diff(1))."""
+    old_path, new_path = Path(args.old), Path(args.new)
+    try:
+        old = load_build(old_path) if old_path.exists() else None
+        new = load_build(new_path)
+    except DiffError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return EXIT_USAGE
+    result = compare(old, new)
+    if args.json:
+        json.dump(result, sys.stdout, ensure_ascii=False, indent=2)
+        print()
+    else:
+        for line in format_text(result):
+            print(line)
+    return 1 if result["changed"] or old is None else EXIT_OK
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="proxyfleet",
@@ -165,6 +185,14 @@ def main(argv=None) -> int:
     bld.add_argument("--include-observing", action="store_true",
                      help="build the canary (the collection must also include observing machines)")
     bld.set_defaults(func=cmd_build)
+
+    dif = sub.add_parser("diff", help="compare two builds by node names, counts and groups",
+                         description="Compare two build outputs. Reads only manifest.json, never node details. "
+                                     "Exit status: 0 no changes, 1 changes, 2 error.")
+    dif.add_argument("old", help="previous build output (may not exist yet)")
+    dif.add_argument("new", help="new build output")
+    dif.add_argument("--json", action="store_true", help="machine-readable output")
+    dif.set_defaults(func=cmd_diff)
 
     try:
         args = parser.parse_args(argv)
