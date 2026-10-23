@@ -101,6 +101,8 @@ def test_retired_names_include_retired_machines(data):
     (lambda d: d["groups"].update(role="Fleet"), "groups.role: must be a string containing {role}"),
     (lambda d: d["roles"].update(Bad={}), "role keys must match"),
     (lambda d: d["roles"]["google"].update(label="AI"), "duplicate group name(s)"),
+    (lambda d: d["groups"].update(role="Fleet, {role}"), "contains a forbidden character"),
+    (lambda d: d["roles"]["ai"].update(label="A=I"), "group name '🛰️ Fleet-A=I' contains a forbidden character"),
     (lambda d: d["lifecycle"]["observing"].update(deny_roles=["nope"]), "unknown role 'nope'"),
     (lambda d: d.update(machines=[]), "machines: must be a non-empty list"),
 ])
