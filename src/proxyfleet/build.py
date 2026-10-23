@@ -86,7 +86,7 @@ def _load_fragments(inventory, fragments, manifest, include_observing):
                         raise FragmentError(f"contains a {label}")
                 if sorted(node_names(client, text)) != sorted(expected_names(machine, client)):
                     raise FragmentError("node names differ from the inventory; run collect again")
-                entries[client].update(_entries(client, text))
+                entries[client].update(node_entries(client, text))
             except (UnicodeDecodeError, FragmentError) as error:
                 failures.append(f"{where}: {error}")
     if failures:
@@ -153,7 +153,7 @@ def _rename_mihomo_block(block: list[str], new_name: str) -> list[str]:
     return out
 
 
-def _entries(client: str, text: str) -> dict:
+def node_entries(client: str, text: str) -> dict:
     if client == "mihomo":
         blocks = _mihomo_blocks(text)
         parsed = {p["name"]: p for p in yaml.safe_load(text)["proxies"] or []}
@@ -248,6 +248,7 @@ def build(inventory: Inventory, fragments: Path, out: Path, include_observing: b
         "contract": {
             **contract(inventory, include_observing),
             "nodes": {c: planned_names(inventory, c, include_observing) for c in inventory.clients},
+            "groups": {c: client_groups(inventory, c, include_observing) for c in inventory.clients},
         },
         "files": {},
     }

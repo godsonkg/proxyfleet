@@ -7,7 +7,7 @@
 
 用一份清单文件管理多台自建代理服务器，并规划配套的 Surge、Loon、Mihomo（Clash Meta）订阅。
 
-> **状态：早期开发（0.1.0.dev0）。** 目前可用 `validate`、`plan`、`collect` 和 `build`；版本比较和发布是下一步，见 [设计文档](docs/design.md)。
+> **状态：早期开发（0.1.0.dev0）。** 目前可用 `validate`、`plan`、`collect`、`build` 和 `diff`；发布是下一步，见 [设计文档](docs/design.md)。
 
 ## 解决什么问题
 
@@ -98,11 +98,33 @@ built/
 - 只修改每个节点的名称，其余每一行原样保留；Mihomo 的每次改名都会在改名前后各解析一次进行核对。
 - 替换 `--out` 之前会重新读取结果并与 `plan` 比对。和 `collect` 一样，失败时上一版输出保持不变。
 
+### 比较两次生成
+
+生成到新目录，用之前先和上一版比较：
+
+```bash
+proxyfleet diff ~/private/built ~/private/built-new
+```
+
+```text
+inventory: changed
+[surge] 4 -> 5 nodes
+  + 🇺🇸 US-NEW-AnyTLS
+  ~ 🇯🇵 JP-TYO-AnyTLS: details changed (e.g. password, port or SNI; not shown)
+  group 🛰️ Fleet-Telegram
+    + 🇺🇸 US-NEW-AnyTLS
+```
+
+- 显示新增和删除的节点、顺序变化、分组成员变化，以及详情有变化的节点。**详情本身永远不显示**，只显示节点名。
+- 旧目录不存在时视为第一次生成。
+- `build` 之后被手工改过的输出会被拒绝（按 manifest 中的文件哈希核对）。
+- 退出码与 `diff` 命令一致：`0` 无变化，`1` 有变化，`2` 出错。`--json` 输出机器可读格式。
+
 ## 路线图
 
 | 版本 | 范围 |
 |---|---|
-| 0.1 | `validate`、`plan`、`collect`、`build`（已完成）；`diff` 与上一版比较（只显示名称和数量） |
+| 0.1 | `validate`、`plan`、`collect`、`build`、`diff`（已完成） |
 | 0.2 | `publish` 经 SFTP 发布到静态 HTTPS 主机，服务端校验后原子切换；秘密路径轮换；生命周期命令（`add`、`promote`、`retire`） |
 | 0.3 | 退役引用发布门禁；把用途分组追加进已有客户端配置，不改变原有默认出口 |
 

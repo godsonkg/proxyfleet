@@ -7,7 +7,7 @@
 
 Manage a fleet of self-hosted proxy servers from one inventory file, and plan the Surge, Loon and Mihomo (Clash Meta) subscriptions that go with it.
 
-> **Status: early development (0.1.0.dev0).** `validate`, `plan`, `collect` and `build` work today. Comparing builds and publishing are next; see [the design](docs/design.md) (Chinese).
+> **Status: early development (0.1.0.dev0).** `validate`, `plan`, `collect`, `build` and `diff` work today. Publishing is next; see [the design](docs/design.md) (Chinese).
 
 ## Why
 
@@ -113,11 +113,33 @@ built/
 - Only the name of each node is changed. Every other line is kept byte for byte, and each Mihomo rename is verified by parsing the item before and after.
 - Before replacing `--out`, the result is re-read and compared with `plan`. As with `collect`, a failed build leaves the previous output untouched.
 
+### Comparing builds
+
+Build into a new directory and compare it with the last one before you use it:
+
+```bash
+proxyfleet diff ~/private/built ~/private/built-new
+```
+
+```text
+inventory: changed
+[surge] 4 -> 5 nodes
+  + 🇺🇸 US-NEW-AnyTLS
+  ~ 🇯🇵 JP-TYO-AnyTLS: details changed (e.g. password, port or SNI; not shown)
+  group 🛰️ Fleet-Telegram
+    + 🇺🇸 US-NEW-AnyTLS
+```
+
+- Shows added and removed nodes, order changes, group membership changes, and nodes whose details changed. **Details themselves are never shown**, only the node names.
+- A missing old directory is treated as a first build.
+- Builds edited by hand after `build` are rejected (file hashes are checked against the manifest).
+- Exit status is like `diff`: `0` no changes, `1` changes, `2` error. `--json` gives machine-readable output.
+
 ## Roadmap
 
 | Version | Scope |
 |---|---|
-| 0.1 | `validate`, `plan`, `collect`, `build` (done); `diff` against the last build (names and counts only) |
+| 0.1 | `validate`, `plan`, `collect`, `build`, `diff` (done) |
 | 0.2 | `publish` to a static HTTPS host over SFTP with server-side verification and atomic switch; secret path rotation; lifecycle commands (`add`, `promote`, `retire`) |
 | 0.3 | Release gates for retired references; append role groups into existing client configs without changing their defaults |
 
