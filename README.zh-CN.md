@@ -7,7 +7,7 @@
 
 用一份清单文件管理多台自建代理服务器，并规划配套的 Surge、Loon、Mihomo（Clash Meta）订阅。
 
-> **状态：早期开发（0.1.0.dev0）。** 目前可用 `validate`、`plan`、`collect`、`build` 和 `diff`；发布是下一步，见 [设计文档](docs/design.md)。
+> **状态：0.1.0，早期版本。** `validate`、`plan`、`collect`、`build`、`diff` 均可使用；发布到 HTTPS 主机将在 0.2 提供，见 [设计文档](docs/design.md) 和 [更新记录](CHANGELOG.md)。
 
 ## 解决什么问题
 
@@ -28,7 +28,7 @@ proxyfleet 运行在你自己的电脑上（Windows、macOS、Linux），不需�
 需要 Python 3.9+。
 
 ```bash
-pipx install git+https://github.com/godsonkg/proxyfleet
+pipx install git+https://github.com/godsonkg/proxyfleet@v0.1.0
 ```
 
 开发安装：
@@ -132,7 +132,7 @@ inventory: changed
 
 - 清单只放地址和角色。**不要写入密码、UUID、密钥或订阅地址。**
 - 生成的订阅文件会包含完整节点凭据，不要放进 Git、网盘或聊天。
-- 清单校验的错误会指出出错的字段和值，清单本身不含秘密。后续处理订阅文件的阶段只会报告固定错误码，不回显文件内容。
+- 清单校验的错误会指出出错的字段和值，清单本身不含秘密。`collect`、`build`、`diff` 的输出只提到机器、客户端和节点名，不回显片段或文件内容。
 
 ## 许可证
 

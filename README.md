@@ -7,7 +7,7 @@
 
 Manage a fleet of self-hosted proxy servers from one inventory file, and plan the Surge, Loon and Mihomo (Clash Meta) subscriptions that go with it.
 
-> **Status: early development (0.1.0.dev0).** `validate`, `plan`, `collect`, `build` and `diff` work today. Publishing is next; see [the design](docs/design.md) (Chinese).
+> **Status: 0.1.0, early release.** `validate`, `plan`, `collect`, `build` and `diff` are ready to use. Publishing to an HTTPS host comes in 0.2; see [the design](docs/design.md) (Chinese) and the [changelog](CHANGELOG.md).
 
 ## Why
 
@@ -28,7 +28,7 @@ proxyfleet runs on your own computer (Windows, macOS or Linux). It never needs t
 Requires Python 3.9+.
 
 ```bash
-pipx install git+https://github.com/godsonkg/proxyfleet
+pipx install git+https://github.com/godsonkg/proxyfleet@v0.1.0
 ```
 
 Or for development:
@@ -147,7 +147,7 @@ inventory: changed
 
 - The inventory holds addresses and roles only. **Never put passwords, UUIDs, keys or subscription URLs in it.**
 - Generated subscription files will contain full node credentials. Keep them out of Git, cloud drives and chats.
-- Inventory errors name the field and value at fault; the inventory holds no secrets. Later stages that handle generated subscriptions will report fixed error codes and never echo their contents.
+- Inventory errors name the field and value at fault; the inventory holds no secrets. `collect`, `build` and `diff` name machines, clients and nodes in their messages, never fragment or file contents.
 
 ## License
 

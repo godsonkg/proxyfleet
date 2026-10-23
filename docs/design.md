@@ -126,7 +126,7 @@ canary 批次（`--include-observing`）用于在不影响正式订阅的前提�
 - 清单哈希不同时提示 `inventory: changed`；一边是 canary、一边不是时给出警告。
 - 退出码沿用 `diff(1)`：0 无变化，1 有变化，2 出错，方便脚本判断。
 
-**0.1 的发布条件**：`collect`、`build`、`diff` 完成并有测试，能用 frm-node 的 `frm sub fragment` 输出端到端生成三端文件。
+**0.1 的发布条件**（已于 0.1.0 满足）：`collect`、`build`、`diff` 完成并有测试，能用 frm-node 的 `frm sub fragment` 输出端到端生成三端文件。
 
 ## 4. 安全原则
 
