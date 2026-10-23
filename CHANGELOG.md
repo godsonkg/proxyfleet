@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- `publish`: upload a build to your own HTTPS server over SFTP. The server verifies the batch and switches atomically, and the client confirms each file over HTTPS. Server scripts: `server/setup.sh` and `server/proxyfleet-publish.sh`.
+- `rotate-path`: replace the secret subscription path. The old URL keeps working until the new one is confirmed. Checked end to end, rolled back on failure, and tokens are never printed or put on a command line. Server helper: `server/proxyfleet-rotate.sh`.
+
 ## 0.1.0
 
 First release. proxyfleet keeps a fleet of self-hosted proxy servers in one inventory file and builds the Surge, Loon and Mihomo node lists that go with it.

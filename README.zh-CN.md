@@ -145,12 +145,27 @@ proxyfleet publish ~/private/built
 - `publish` 随后通过 HTTPS 下载每个文件，直到 SHA-256 一致；90 秒内未一致即报错（`--verify-timeout`）。
 - 秘密路径不会出现在任何输出中。
 
+### 轮换秘密路径
+
+订阅地址泄露时（发进了聊天、截图或日志），换一个新的：
+
+```bash
+proxyfleet rotate-path            # 会要求确认；加 --yes 跳过
+proxyfleet rotate-path --admin me # 用有免密 sudo 的用户代替 root
+```
+
+1. 服务器同时在旧路径和新路径下提供当前文件，proxyfleet 核对两边完全一致。
+2. 只替换 `publish.yaml` 里 `base_url` 的 token，保留注释和权限。
+3. 服务器停用旧路径；proxyfleet 确认新路径可用、**旧路径返回 404**。
+
+第 3 步之前任何一步失败，服务器都会回滚、`publish.yaml` 也会还原，旧地址继续可用。中途被打断时用 `proxyfleet rotate-path --rollback` 撤销。轮换期间如果正好有新的发布，两个路径都会提供新内容，不会出现过期文件。token 只通过 SSH 的标准输入传递，不出现在命令行，也不会被打印。完成后把 `publish.yaml` 里的新地址更新到每个客户端。
+
 ## 路线图
 
 | 版本 | 范围 |
 |---|---|
 | 0.1 | `validate`、`plan`、`collect`、`build`、`diff`（已完成） |
-| 0.2 | `publish` 经 SFTP 发布到静态 HTTPS 主机，服务端校验后原子切换（已完成，尚未发布）；秘密路径轮换；生命周期命令（`add`、`promote`、`retire`） |
+| 0.2 | `publish` 经 SFTP 发布到静态 HTTPS 主机，服务端校验后原子切换、秘密路径轮换（已完成，尚未发布）；生命周期命令（`add`、`promote`、`retire`） |
 | 0.3 | 退役引用发布门禁；把用途分组追加进已有客户端配置，不改变原有默认出口 |
 
 ## 安全

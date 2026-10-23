@@ -160,12 +160,27 @@ proxyfleet publish ~/private/built
 - `publish` then downloads every file over HTTPS until its SHA-256 matches, and fails if that does not happen within 90 seconds (`--verify-timeout`).
 - The secret path never appears in any output.
 
+### Rotating the secret path
+
+If the subscription URL leaks (pasted into a chat, a screenshot, a log), replace it:
+
+```bash
+proxyfleet rotate-path            # asks for confirmation; --yes to skip
+proxyfleet rotate-path --admin me # a user with passwordless sudo instead of root
+```
+
+1. The server serves the current files under **both** the old and the new path, and proxyfleet checks they are identical.
+2. Only the `base_url` token in `publish.yaml` is replaced, keeping comments and permissions.
+3. The server drops the old path. proxyfleet checks that the new path works and the **old one returns 404**.
+
+If anything fails before step 3, the server is rolled back and `publish.yaml` restored, so the old URL keeps working. `proxyfleet rotate-path --rollback` undoes an interrupted run. A publish that lands mid-rotation is served under both paths, so nothing goes stale. Tokens travel over SSH stdin, never on a command line, and are never printed. Afterwards, give every client the new URL from `publish.yaml`.
+
 ## Roadmap
 
 | Version | Scope |
 |---|---|
 | 0.1 | `validate`, `plan`, `collect`, `build`, `diff` (done) |
-| 0.2 | `publish` to a static HTTPS host over SFTP with server-side verification and atomic switch (done, unreleased); secret path rotation; lifecycle commands (`add`, `promote`, `retire`) |
+| 0.2 | `publish` to a static HTTPS host over SFTP with server-side verification and atomic switch, secret path rotation (done, unreleased); lifecycle commands (`add`, `promote`, `retire`) |
 | 0.3 | Release gates for retired references; append role groups into existing client configs without changing their defaults |
 
 ## Security

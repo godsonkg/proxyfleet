@@ -1,5 +1,7 @@
-"""Shared test helpers: fake fragments in the layout frm-node produces."""
+"""Shared test helpers: fake fragments in the layout frm-node produces, and fake tools."""
 
+import shutil
+import subprocess
 from pathlib import Path
 
 EXAMPLE = Path(__file__).resolve().parents[1] / "examples" / "fleet.example.yaml"
@@ -45,3 +47,39 @@ def make_build(tmp_path, name, inventory_path=EXAMPLE, edit=None, include_observ
     collect(inventory, DirSource(src), tmp_path / f"{name}-collected", include_observing=include_observing)
     build(inventory, tmp_path / f"{name}-collected", tmp_path / name, include_observing=include_observing)
     return tmp_path / name
+
+
+class FakeClock:
+    def __init__(self):
+        self.now = 0.0
+
+    def __call__(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.now += seconds
+
+
+class FakeSftp:
+    """Executes the `lcd`/`put` batch file into an inbox directory, recording the order."""
+
+    def __init__(self, inbox, after_upload=None, exit_code=0):
+        self.inbox, self.after_upload, self.exit_code = inbox, after_upload, exit_code
+        self.commands, self.order = [], []
+
+    def __call__(self, command, **kwargs):
+        self.commands.append(command)
+        if self.exit_code:
+            return subprocess.CompletedProcess(command, self.exit_code)
+        batch_file = Path(command[command.index("-b") + 1])
+        lines = batch_file.read_bytes().decode("ascii").splitlines()
+        local = Path(kwargs["cwd"])
+        self.inbox.mkdir(parents=True, exist_ok=True)
+        for line in lines:
+            verb, name = line.split()
+            assert verb == "put" and "/" not in name and "\\" not in name
+            shutil.copy(local / name, self.inbox / name)
+            self.order.append(name)
+        if self.after_upload:
+            self.after_upload()
+        return subprocess.CompletedProcess(command, 0)
