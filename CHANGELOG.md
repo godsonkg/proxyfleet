@@ -3,6 +3,7 @@
 ## Unreleased
 
 - `publish`: upload a build to your own HTTPS server over SFTP. The server verifies the batch and switches atomically, and the client confirms each file over HTTPS. Server scripts: `server/setup.sh` and `server/proxyfleet-publish.sh`.
+- `machine list/add/promote/disable/enable/retire/set-host`: change machines without hand-editing `fleet.yaml`. Comments and layout are kept, every edit is validated before an atomic write, and each command shows its effect on the published node lists. `add --discover` reads protocols from frm-node over SSH.
 - `rotate-path`: replace the secret subscription path. The old URL keeps working until the new one is confirmed. Checked end to end, rolled back on failure, and tokens are never printed or put on a command line. Server helper: `server/proxyfleet-rotate.sh`.
 
 ## 0.1.0

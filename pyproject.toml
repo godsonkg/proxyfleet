@@ -9,7 +9,7 @@ description = "Manage a fleet of self-hosted proxy servers and plan Surge, Loon 
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.9"
-dependencies = ["PyYAML>=6.0"]
+dependencies = ["PyYAML>=6.0", "ruamel.yaml>=0.18"]
 classifiers = [
   "Environment :: Console",
   "License :: OSI Approved :: MIT License",

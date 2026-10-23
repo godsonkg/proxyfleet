@@ -95,7 +95,7 @@ canary 批次（`--include-observing`）用于在不影响正式订阅的前提�
 | `diff <旧目录> <新目录> [--json]` | 0.1 ✅ | 比较节点名、顺序、数量、分组成员和节点详情；只显示节点名；见 3.3 | 本地读取，不显示 |
 | `publish <生成目录> [--config] [--dry-run]` | 0.2 ✅ | SFTP 上传批次，服务端校验 SHA-256、大小、数量和结构后原子切换，再经 HTTPS 回读核对；见 3.4 | 是 |
 | `rotate-path [--admin] [--yes] [--rollback]` | 0.2 ✅ | 新旧秘密路径短暂并存，验证新路径后关闭旧路径，全程不打印路径；见 3.5 | 否（只读 HTTPS 内容做比较） |
-| `add` / `promote` / `disable` / `retire` | 0.2 | 修改清单中的机器状态；`add` 可经 SSH 自动发现协议 | 否 |
+| `machine list/add/promote/disable/enable/retire/set-host` | 0.2 ✅ | 修改清单中的机器；`add --discover` 经 SSH 自动发现协议；见 3.6 | 否 |
 | `gate` | 0.3 | 退役引用与秘密泄露门禁，用于任意客户端配置 | 是 |
 | `bind` | 0.3 | 把用途分组追加到已有客户端配置的业务组末尾，不改变默认出口，可重复运行 | 是 |
 
@@ -153,6 +153,14 @@ canary 批次（`--include-observing`）用于在不影响正式订阅的前提�
 - `finalize`：`@subscription` 只匹配新路径，校验通过后写入 `path-token` 并删除 `.next` 和备份。之后的发布直接使用新 token。
 - `rollback`：只需要旧 token，新 token 从服务器的 `.next` 读取；还原站点文件，删除所有 release 中的新路径链接。
 - 客户端：只在 `publish.yaml` 中替换 token 字符串（必须恰好出现一次），原子写入并保留权限；`finalize` 之前任何失败都会回滚服务器并还原 `publish.yaml`；`finalize` 之后的检查失败只报告，不回滚。
+
+### 3.6 machine 命令的约定
+
+- 用 ruamel.yaml 的往返模式编辑，保留注释、引号和流式列表；编辑前先确认"原样读入再写出"与原文件逐字节一致，不一致就拒绝，绝不悄悄重排整个文件。新增机器时沿用文件中机器之间的空行风格。
+- 状态转换：`add` → observing；`promote` 只允许 observing → active，可同时用 `--allow` 加角色（并从 deny 中移除）；`disable` 允许 active/observing → disabled；`enable` 只允许 disabled → active（或 `--observing`）；`retire` 允许任何未退役状态 → retired，需要确认。
+- 每次修改都把结果当作完整清单重新校验（与 `validate` 相同的规则），通过后才原子写入并保留权限；校验失败时什么都不写。
+- 输出的是对**正式发布**（只含 active 机器）节点列表和分组的影响，`--dry-run` 只显示不写入。
+- `add --discover` 对每个客户端运行 `frm-node sub fragment --prefix <机器名>`，节点名必须是 `<机器名>-<协议>`；某个客户端没有任何协议时 frm-node 输出为空，视为空列表而不是失败。
 
 **0.1 的发布条件**（已于 0.1.0 满足）：`collect`、`build`、`diff` 完成并有测试，能用 frm-node 的 `frm sub fragment` 输出端到端生成三端文件。
 
