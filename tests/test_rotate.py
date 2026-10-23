@@ -29,7 +29,7 @@ base_url: https://sub.example.com/{OLD}
 
 def write_config(directory, text=CONFIG_TEXT):
     path = directory / "publish.yaml"
-    path.write_text(text, encoding="utf-8")
+    path.write_bytes(text.encode("utf-8"))  # keep LF on Windows too
     if sys.platform != "win32":
         path.chmod(0o600)
     return path
@@ -41,7 +41,7 @@ def test_replace_token_keeps_comments_and_mode(tmp_path):
     path = write_config(tmp_path)
     original = replace_token_in_config(path, OLD, NEW)
     assert original.decode() == CONFIG_TEXT
-    assert path.read_text(encoding="utf-8") == CONFIG_TEXT.replace(OLD, NEW)
+    assert path.read_bytes().decode("utf-8") == CONFIG_TEXT.replace(OLD, NEW)
     if sys.platform != "win32":
         assert path.stat().st_mode & 0o777 == 0o600
     assert [p.name for p in tmp_path.iterdir()] == ["publish.yaml"]

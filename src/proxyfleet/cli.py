@@ -173,11 +173,17 @@ def cmd_rotate_path(args) -> int:
             print("rolled back: the server serves the path in your publish config only")
             return EXIT_OK
         if not args.yes:
-            if not sys.stdin.isatty():
+            answer = None
+            if sys.stdin.isatty():
+                try:
+                    answer = input("Rotate the subscription path? Every client must then be given the new URL. [y/N] ")
+                except EOFError:
+                    # Windows reports the NUL device as a terminal.
+                    answer = None
+            if answer is None:
                 print("error: rotating breaks every client's current subscription URL; "
                       "pass --yes to confirm", file=sys.stderr)
                 return EXIT_USAGE
-            answer = input("Rotate the subscription path? Every client must then be given the new URL. [y/N] ")
             if answer.strip().lower() not in ("y", "yes"):
                 print("cancelled; nothing was changed")
                 return EXIT_OK
