@@ -46,7 +46,9 @@ class PublishError(Exception):
 
 
 class FetchError(Exception):
-    pass
+    def __init__(self, reason: str, status: int | None = None):
+        super().__init__(reason)
+        self.status = status
 
 
 @dataclass(frozen=True)
@@ -98,7 +100,7 @@ def https_get(url: str, timeout: float = 15) -> bytes:
         with urllib.request.urlopen(request, timeout=timeout, context=ssl.create_default_context()) as response:
             data = response.read(MAX_DOWNLOAD)
     except urllib.error.HTTPError as error:
-        raise FetchError(f"HTTP {error.code}") from None
+        raise FetchError(f"HTTP {error.code}", status=error.code) from None
     except (urllib.error.URLError, ssl.SSLError, OSError) as error:
         reason = getattr(error, "reason", error)
         kind = "TLS error" if isinstance(reason, ssl.SSLError) else "connection failed"

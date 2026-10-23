@@ -27,7 +27,9 @@ die() { echo "error: $*" >&2; exit 1; }
   die "PF_DOMAIN must be a host name such as sub.example.com"
 [[ $PF_UPLOAD_PUBKEY =~ ^(ssh-ed25519|ecdsa-sha2-nistp256|ssh-rsa)\ [A-Za-z0-9+/=]+(\ [^[:cntrl:]]*)?$ ]] ||
   die "PF_UPLOAD_PUBKEY must be a single OpenSSH public key line"
-[[ -f $SCRIPT_DIR/proxyfleet-publish.sh ]] || die "proxyfleet-publish.sh not found next to this script"
+for helper in proxyfleet-publish.sh proxyfleet-rotate.sh; do
+  [[ -f $SCRIPT_DIR/$helper ]] || die "$helper not found next to this script"
+done
 grep -qE '^[[:space:]]*Include[[:space:]]+/etc/ssh/sshd_config\.d/\*\.conf' /etc/ssh/sshd_config ||
   die "/etc/ssh/sshd_config does not include sshd_config.d/*.conf; add the SFTP settings by hand"
 
@@ -83,6 +85,7 @@ token=$(tr -d '\r\n' </etc/proxyfleet/path-token)
 
 install -d -m 0755 -o root -g root /usr/local/libexec
 install -m 0755 -o root -g root "$SCRIPT_DIR/proxyfleet-publish.sh" /usr/local/libexec/proxyfleet-publish
+install -m 0755 -o root -g root "$SCRIPT_DIR/proxyfleet-rotate.sh" /usr/local/libexec/proxyfleet-rotate
 
 cat >/etc/systemd/system/proxyfleet-publish.service <<EOF
 [Unit]

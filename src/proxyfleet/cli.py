@@ -16,6 +16,7 @@ from .fsutil import OutputError
 from .inventory import InventoryError, load
 from .plan import build_plan
 from .publish import PublishError, default_config_path, load_config, prepare, publish
+from .rotate import RotateError, rollback, rotate
 
 EXIT_OK, EXIT_INVALID, EXIT_USAGE = 0, 1, 2
 
@@ -164,6 +165,38 @@ def cmd_publish(args) -> int:
     return EXIT_OK
 
 
+def cmd_rotate_path(args) -> int:
+    config_path = Path(args.config) if args.config else default_config_path()
+    try:
+        if args.rollback:
+            rollback(config_path, admin=args.admin, ssh_options=args.ssh_option)
+            print("rolled back: the server serves the path in your publish config only")
+            return EXIT_OK
+        if not args.yes:
+            answer = None
+            if sys.stdin.isatty():
+                try:
+                    answer = input("Rotate the subscription path? Every client must then be given the new URL. [y/N] ")
+                except EOFError:
+                    # Windows reports the NUL device as a terminal.
+                    answer = None
+            if answer is None:
+                print("error: rotating breaks every client's current subscription URL; "
+                      "pass --yes to confirm", file=sys.stderr)
+                return EXIT_USAGE
+            if answer.strip().lower() not in ("y", "yes"):
+                print("cancelled; nothing was changed")
+                return EXIT_OK
+        result = rotate(config_path, admin=args.admin, ssh_options=args.ssh_option, timeout=args.timeout,
+                        progress=lambda line: print(line, flush=True))
+    except (PublishError, RotateError) as error:
+        print(f"error: {error}", file=sys.stderr)
+        return EXIT_INVALID
+    print(f"rotated: {', '.join(result['files'])} now served only under the new path; the old one returns 404")
+    print(f"the new URL is in {config_path}; give it to every client (it is not printed here)")
+    return EXIT_OK
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="proxyfleet",
@@ -222,6 +255,19 @@ def main(argv=None) -> int:
                      help="how long to wait for HTTPS to serve the new files (default: 90)")
     pub.add_argument("--dry-run", action="store_true", help="check the build without uploading")
     pub.set_defaults(func=cmd_publish)
+
+    rot = sub.add_parser("rotate-path", help="replace the secret subscription path, e.g. after it leaked",
+                         description="Serve the subscription under a new secret path, update publish.yaml, "
+                                     "then retire the old path. Neither path is printed.")
+    rot.add_argument("--config", help=f"publish config (default: {default_config_path()})")
+    rot.add_argument("--admin", default="root", metavar="USER",
+                     help="SSH user that may run the server helper (root, or a user with passwordless sudo)")
+    rot.add_argument("--ssh-option", action="append", default=[], metavar="OPT", help="extra ssh argument, repeatable")
+    rot.add_argument("--timeout", type=float, default=30, metavar="SECONDS",
+                     help="how long to wait for each HTTPS check (default: 30)")
+    rot.add_argument("--yes", action="store_true", help="do not ask for confirmation")
+    rot.add_argument("--rollback", action="store_true", help="undo an interrupted rotation")
+    rot.set_defaults(func=cmd_rotate_path)
 
     try:
         args = parser.parse_args(argv)

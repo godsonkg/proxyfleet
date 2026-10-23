@@ -94,7 +94,7 @@ canary 批次（`--include-observing`）用于在不影响正式订阅的前提�
 | `build <清单> --fragments <目录> --out <目录>` | 0.1 ✅ | 生成三端 provider 文件、分组片段和契约；名称、顺序、数量不符即失败；见 3.2 | 是 |
 | `diff <旧目录> <新目录> [--json]` | 0.1 ✅ | 比较节点名、顺序、数量、分组成员和节点详情；只显示节点名；见 3.3 | 本地读取，不显示 |
 | `publish <生成目录> [--config] [--dry-run]` | 0.2 ✅ | SFTP 上传批次，服务端校验 SHA-256、大小、数量和结构后原子切换，再经 HTTPS 回读核对；见 3.4 | 是 |
-| `rotate-path` | 0.2 | 新旧秘密路径短暂并存，验证新路径后关闭旧路径，全程不打印路径 | 是 |
+| `rotate-path [--admin] [--yes] [--rollback]` | 0.2 ✅ | 新旧秘密路径短暂并存，验证新路径后关闭旧路径，全程不打印路径；见 3.5 | 否（只读 HTTPS 内容做比较） |
 | `add` / `promote` / `disable` / `retire` | 0.2 | 修改清单中的机器状态；`add` 可经 SSH 自动发现协议 | 否 |
 | `gate` | 0.3 | 退役引用与秘密泄露门禁，用于任意客户端配置 | 是 |
 | `bind` | 0.3 | 把用途分组追加到已有客户端配置的业务组末尾，不改变默认出口，可重复运行 | 是 |
@@ -142,6 +142,17 @@ canary 批次（`--include-observing`）用于在不影响正式订阅的前提�
 - 通过后写入新的 release 目录，`ln -s` + `mv -T` 原子切换 `current`；保留最近 5 个 release，失败残留 7 天后清理。
 - Caddy：写入 `/etc/caddy/proxyfleet.caddy` 并在 Caddyfile 中 import；若 Caddyfile 只是安装包自带的欢迎页则替换，否则追加；`caddy validate` 失败即还原备份。站点只放行三个订阅文件路径。
 - 秘密路径在 `/etc/proxyfleet/path-token`，安装脚本不打印它，只提示用 `sudo cat` 读取一次。
+
+### 3.5 rotate-path 的约定
+
+- 服务端助手 `/usr/local/libexec/proxyfleet-rotate`（由 `setup.sh` 安装），三个阶段：`prepare`、`finalize`、`rollback`。客户端通过 `ssh <admin>@<host>` 调用（非 root 时用 `sudo -n`），**旧/新 token 只经标准输入传递**，不进命令行参数和进程列表；助手只输出 `PF_ROTATE_*` 标记，错误信息以 `rotate: ` 开头且不含 token。
+- 助手持有发布脚本的同一把 `flock` 锁，任何阶段都不会与发布交错。
+- `prepare`：核对服务器当前 token 与 `publish.yaml` 一致、没有进行中的轮换；备份站点文件；写入 `path-token.next`；在当前 release 中建立 新 → 旧 的符号链接；把站点文件的 `@subscription` 行改为同时匹配新旧路径；`caddy validate` 失败则全部还原。
+- 轮换期间发布：发布脚本发现 `path-token.next` 时，给新 release 也建立 新 → 旧 链接，所以新路径始终提供最新内容。
+- 客户端检查新路径时与旧路径**实时比较**（而不是与轮换前的快照比较），这样轮换期间正好有发布也不会误判。
+- `finalize`：`@subscription` 只匹配新路径，校验通过后写入 `path-token` 并删除 `.next` 和备份。之后的发布直接使用新 token。
+- `rollback`：只需要旧 token，新 token 从服务器的 `.next` 读取；还原站点文件，删除所有 release 中的新路径链接。
+- 客户端：只在 `publish.yaml` 中替换 token 字符串（必须恰好出现一次），原子写入并保留权限；`finalize` 之前任何失败都会回滚服务器并还原 `publish.yaml`；`finalize` 之后的检查失败只报告，不回滚。
 
 **0.1 的发布条件**（已于 0.1.0 满足）：`collect`、`build`、`diff` 完成并有测试，能用 frm-node 的 `frm sub fragment` 输出端到端生成三端文件。
 

@@ -14,6 +14,7 @@ UPLOAD_DIR=${PF_UPLOAD_DIR:-$BASE_DIR/sftp/proxyfleet/upload}
 RELEASES_DIR=${PF_RELEASES_DIR:-$BASE_DIR/releases}
 CURRENT_LINK=${PF_CURRENT_LINK:-$BASE_DIR/current}
 TOKEN_FILE=${PF_TOKEN_FILE:-/etc/proxyfleet/path-token}
+NEXT_FILE=${PF_NEXT_TOKEN_FILE:-$TOKEN_FILE.next}
 LOCK_FILE=${PF_LOCK_FILE:-/run/lock/proxyfleet-publish.lock}
 PUBLISH_GROUP=${PF_PUBLISH_GROUP:-caddy}
 KEEP_RELEASES=${PF_KEEP_RELEASES:-5}
@@ -137,6 +138,12 @@ for client in "${clients[@]}"; do
   install -m 0640 "${owner_args[@]}" "$UPLOAD_DIR/$batch.$name" "$release/$token/$name"
 done
 install -m 0640 "${owner_args[@]}" "$contract" "$release/contract.env"
+# During a path rotation (proxyfleet-rotate), serve the new path as well.
+if [[ -f $NEXT_FILE ]]; then
+  next=$(tr -d '\r\n' <"$NEXT_FILE")
+  [[ $next =~ ^[0-9a-f]{64}$ && $next != "$token" ]] || reject "invalid pending path token"
+  ln -s "$token" "$release/$next"
+fi
 
 new_link=$BASE_DIR/.current-$batch
 ln -s "$release" "$new_link"

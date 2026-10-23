@@ -11,7 +11,7 @@ import yaml
 from proxyfleet.cli import main
 from proxyfleet.publish import FetchError, PublishConfig, PublishError, load_config, prepare, publish
 
-from helpers import EXAMPLE, make_build
+from helpers import EXAMPLE, FakeClock, FakeSftp, make_build
 
 TOKEN = "a" * 64
 BASE_URL = f"https://sub.example.com/{TOKEN}"
@@ -20,49 +20,13 @@ SERVER_SCRIPT = Path(__file__).resolve().parents[1] / "server" / "proxyfleet-pub
 LINUX = sys.platform.startswith("linux") and all(shutil.which(t) for t in ("bash", "flock", "sha256sum"))
 
 
-class FakeClock:
-    def __init__(self):
-        self.now = 0.0
-
-    def __call__(self):
-        return self.now
-
-    def sleep(self, seconds):
-        self.now += seconds
-
-
-class FakeSftp:
-    """Executes the `lcd`/`put` batch file into an inbox directory, recording the order."""
-
-    def __init__(self, inbox, after_upload=None, exit_code=0):
-        self.inbox, self.after_upload, self.exit_code = inbox, after_upload, exit_code
-        self.commands, self.order = [], []
-
-    def __call__(self, command, **kwargs):
-        self.commands.append(command)
-        if self.exit_code:
-            return subprocess.CompletedProcess(command, self.exit_code)
-        batch_file = Path(command[command.index("-b") + 1])
-        lines = batch_file.read_bytes().decode("ascii").splitlines()
-        local = Path(kwargs["cwd"])
-        self.inbox.mkdir(parents=True, exist_ok=True)
-        for line in lines:
-            verb, name = line.split()
-            assert verb == "put" and "/" not in name and "\\" not in name
-            shutil.copy(local / name, self.inbox / name)
-            self.order.append(name)
-        if self.after_upload:
-            self.after_upload()
-        return subprocess.CompletedProcess(command, 0)
-
-
 def serve_from(directory):
     """A fetch function that serves <directory>/<file> for BASE_URL/<file>."""
     def fetch(url):
         assert url.startswith(BASE_URL + "/")
         path = directory / url[len(BASE_URL) + 1:]
         if not path.is_file():
-            raise FetchError("HTTP 404")
+            raise FetchError("HTTP 404", status=404)
         return path.read_bytes()
     return fetch
 
