@@ -1,10 +1,18 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
+
+Adds publishing to your own server and managing machines from the command line.
 
 - `publish`: upload a build to your own HTTPS server over SFTP. The server verifies the batch and switches atomically, and the client confirms each file over HTTPS. Server scripts: `server/setup.sh` and `server/proxyfleet-publish.sh`.
 - `machine list/add/promote/disable/enable/retire/set-host`: change machines without hand-editing `fleet.yaml`. Comments and layout are kept, every edit is validated before an atomic write, and each command shows its effect on the published node lists. `add --discover` reads protocols from frm-node over SSH.
 - `rotate-path`: replace the secret subscription path. The old URL keeps working until the new one is confirmed. Checked end to end, rolled back on failure, and tokens are never printed or put on a command line. Server helper: `server/proxyfleet-rotate.sh`.
+
+### Known limits
+
+- **The server scripts (`setup.sh`, the publisher and the rotation helper) have not yet been run on a real host.** Their logic is covered by tests that run the real scripts with SSH, Caddy and systemd stubbed, and the Caddy configuration was validated with Caddy 2.6.2. Try them on a spare VPS before relying on them, and report problems in an issue.
+- `setup.sh` supports Debian and Ubuntu with Caddy available from apt (Debian 12+, Ubuntu 24.04+). On older releases, install Caddy from its official repository first.
+- Loon node lists have not yet been tested by importing them on a device.
 
 ## 0.1.0
 

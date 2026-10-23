@@ -7,7 +7,7 @@
 
 Manage a fleet of self-hosted proxy servers from one inventory file, and plan the Surge, Loon and Mihomo (Clash Meta) subscriptions that go with it.
 
-> **Status: 0.1.0, early release.** `validate`, `plan`, `collect`, `build` and `diff` are ready to use. Publishing to an HTTPS host comes in 0.2; see [the design](docs/design.md) (Chinese) and the [changelog](CHANGELOG.md).
+> **Status: 0.2.0, early release.** Planning, collecting, building, comparing, machine management, publishing to your own HTTPS host and secret-path rotation are all in. The server scripts have not yet been verified on a real host; try them on a spare VPS first. See [the design](docs/design.md) (Chinese) and the [changelog](CHANGELOG.md).
 
 ## Why
 
@@ -28,7 +28,7 @@ proxyfleet runs on your own computer (Windows, macOS or Linux). It never needs t
 Requires Python 3.9+.
 
 ```bash
-pipx install git+https://github.com/godsonkg/proxyfleet@v0.1.0
+pipx install git+https://github.com/godsonkg/proxyfleet@v0.2.0
 ```
 
 Or for development:
@@ -153,7 +153,7 @@ inventory: changed
 - Builds edited by hand after `build` are rejected (file hashes are checked against the manifest).
 - Exit status is like `diff`: `0` no changes, `1` changes, `2` error. `--json` gives machine-readable output.
 
-### Publishing to your own HTTPS host (unreleased, coming in 0.2)
+### Publishing to your own HTTPS host
 
 `publish` uploads a build to a small static server you control, so clients can subscribe to it.
 
@@ -198,7 +198,7 @@ If anything fails before step 3, the server is rolled back and `publish.yaml` re
 | Version | Scope |
 |---|---|
 | 0.1 | `validate`, `plan`, `collect`, `build`, `diff` (done) |
-| 0.2 | `publish` to a static HTTPS host over SFTP with server-side verification and atomic switch, secret path rotation and lifecycle commands (`machine add`, `promote`, `disable`, `enable`, `retire`, `set-host`) (done, unreleased) |
+| 0.2 | `publish` to a static HTTPS host over SFTP with server-side verification and atomic switch, secret path rotation and lifecycle commands (`machine add`, `promote`, `disable`, `enable`, `retire`, `set-host`) (done) |
 | 0.3 | Release gates for retired references; append role groups into existing client configs without changing their defaults |
 
 ## Security

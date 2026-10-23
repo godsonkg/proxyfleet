@@ -7,7 +7,7 @@
 
 用一份清单文件管理多台自建代理服务器，并规划配套的 Surge、Loon、Mihomo（Clash Meta）订阅。
 
-> **状态：0.1.0，早期版本。** `validate`、`plan`、`collect`、`build`、`diff` 均可使用；发布到 HTTPS 主机将在 0.2 提供，见 [设计文档](docs/design.md) 和 [更新记录](CHANGELOG.md)。
+> **状态：0.2.0，早期版本。** 规划、采集、生成、比较、机器管理、发布到自己的 HTTPS 主机和秘密路径轮换均已提供。服务器脚本尚未在真实主机上验证过，请先在闲置的 VPS 上试用。见 [设计文档](docs/design.md) 和 [更新记录](CHANGELOG.md)。
 
 ## 解决什么问题
 
@@ -28,7 +28,7 @@ proxyfleet 运行在你自己的电脑上（Windows、macOS、Linux），不需�
 需要 Python 3.9+。
 
 ```bash
-pipx install git+https://github.com/godsonkg/proxyfleet@v0.1.0
+pipx install git+https://github.com/godsonkg/proxyfleet@v0.2.0
 ```
 
 开发安装：
@@ -138,7 +138,7 @@ inventory: changed
 - `build` 之后被手工改过的输出会被拒绝（按 manifest 中的文件哈希核对）。
 - 退出码与 `diff` 命令一致：`0` 无变化，`1` 有变化，`2` 出错。`--json` 输出机器可读格式。
 
-### 发布到自己的 HTTPS 主机（尚未发布，将在 0.2 提供）
+### 发布到自己的 HTTPS 主机
 
 `publish` 把生成结果上传到你自己控制的一台静态服务器，客户端通过订阅地址自动更新。
 
@@ -183,7 +183,7 @@ proxyfleet rotate-path --admin me # 用有免密 sudo 的用户代替 root
 | 版本 | 范围 |
 |---|---|
 | 0.1 | `validate`、`plan`、`collect`、`build`、`diff`（已完成） |
-| 0.2 | `publish` 经 SFTP 发布到静态 HTTPS 主机，服务端校验后原子切换、秘密路径轮换、生命周期命令（`machine add`、`promote`、`disable`、`enable`、`retire`、`set-host`）（已完成，尚未发布） |
+| 0.2 | `publish` 经 SFTP 发布到静态 HTTPS 主机，服务端校验后原子切换、秘密路径轮换、生命周期命令（`machine add`、`promote`、`disable`、`enable`、`retire`、`set-host`）（已完成） |
 | 0.3 | 退役引用发布门禁；把用途分组追加进已有客户端配置，不改变原有默认出口 |
 
 ## 安全
