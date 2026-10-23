@@ -120,12 +120,37 @@ inventory: changed
 - `build` 之后被手工改过的输出会被拒绝（按 manifest 中的文件哈希核对）。
 - 退出码与 `diff` 命令一致：`0` 无变化，`1` 有变化，`2` 出错。`--json` 输出机器可读格式。
 
+### 发布到自己的 HTTPS 主机（尚未发布，将在 0.2 提供）
+
+`publish` 把生成结果上传到你自己控制的一台静态服务器，客户端通过订阅地址自动更新。
+
+**在一台 Debian/Ubuntu 服务器上做一次**（可以是你的某台 VPS）：
+
+```bash
+git clone https://github.com/godsonkg/proxyfleet && cd proxyfleet
+sudo PF_DOMAIN=sub.example.com PF_UPLOAD_PUBKEY="$(cat 你的上传公钥.pub)" bash server/setup.sh
+```
+
+它会创建一个**只能 SFTP、被 chroot 限制**的上传账号（`proxyfleet`）、一个负责发布上传批次的 systemd 定时器，以及一个 Caddy 站点：只在随机的 64 位路径下提供 `surge.txt`、`loon.txt`、`mihomo.yaml`，其他请求一律 404。已有的 Caddy 站点会保留：proxyfleet 写入自己的配置文件并 import，校验失败会还原你的 Caddyfile。
+
+**在你自己的电脑上**，把 [`examples/publish.example.yaml`](examples/publish.example.yaml) 复制到 `~/.config/proxyfleet/publish.yaml`（Windows 为 `%APPDATA%\proxyfleet\publish.yaml`），填好后 `chmod 600`。然后：
+
+```bash
+proxyfleet publish ~/private/built --dry-run   # 只检查
+proxyfleet publish ~/private/built
+```
+
+- 拒绝发布 canary、含空客户端的生成结果，以及 `build` 之后被改过的结果。
+- 批次的 `.ready` 标记最后上传。服务器核对 SHA-256 清单、契约（客户端、数量、清单哈希）和每个文件的结构，再用一次原子重命名切换线上文件。被拒绝的批次不会影响客户端看到的内容；保留最近 5 个版本。
+- `publish` 随后通过 HTTPS 下载每个文件，直到 SHA-256 一致；90 秒内未一致即报错（`--verify-timeout`）。
+- 秘密路径不会出现在任何输出中。
+
 ## 路线图
 
 | 版本 | 范围 |
 |---|---|
 | 0.1 | `validate`、`plan`、`collect`、`build`、`diff`（已完成） |
-| 0.2 | `publish` 经 SFTP 发布到静态 HTTPS 主机，服务端校验后原子切换；秘密路径轮换；生命周期命令（`add`、`promote`、`retire`） |
+| 0.2 | `publish` 经 SFTP 发布到静态 HTTPS 主机，服务端校验后原子切换（已完成，尚未发布）；秘密路径轮换；生命周期命令（`add`、`promote`、`retire`） |
 | 0.3 | 退役引用发布门禁；把用途分组追加进已有客户端配置，不改变原有默认出口 |
 
 ## 安全

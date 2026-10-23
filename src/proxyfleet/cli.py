@@ -15,6 +15,7 @@ from .diff import DiffError, compare, format_text, load_build
 from .fsutil import OutputError
 from .inventory import InventoryError, load
 from .plan import build_plan
+from .publish import PublishError, default_config_path, load_config, prepare, publish
 
 EXIT_OK, EXIT_INVALID, EXIT_USAGE = 0, 1, 2
 
@@ -144,6 +145,25 @@ def cmd_diff(args) -> int:
     return 1 if result["changed"] or old is None else EXIT_OK
 
 
+def cmd_publish(args) -> int:
+    build_dir = Path(args.build)
+    try:
+        if args.dry_run:
+            manifest, clients = prepare(build_dir)
+            counts = ", ".join(f"{c} {manifest['contract']['counts'][c]}" for c in clients)
+            print(f"dry run: {build_dir} is ready to publish ({counts} nodes); nothing was uploaded")
+            return EXIT_OK
+        config = load_config(Path(args.config) if args.config else default_config_path())
+        summary = publish(build_dir, config, verify_timeout=args.verify_timeout,
+                          progress=lambda line: print(line, flush=True))
+    except PublishError as error:
+        print(f"error: {error}", file=sys.stderr)
+        return EXIT_INVALID
+    counts = ", ".join(f"{client} {count}" for client, count in summary["clients"].items())
+    print(f"published batch {summary['batch']}: {counts} nodes; HTTPS serves the new files")
+    return EXIT_OK
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         prog="proxyfleet",
@@ -194,6 +214,14 @@ def main(argv=None) -> int:
     dif.add_argument("new", help="new build output")
     dif.add_argument("--json", action="store_true", help="machine-readable output")
     dif.set_defaults(func=cmd_diff)
+
+    pub = sub.add_parser("publish", help="upload a build to your proxyfleet server and confirm it over HTTPS")
+    pub.add_argument("build", help="build output directory")
+    pub.add_argument("--config", help=f"publish config (default: {default_config_path()})")
+    pub.add_argument("--verify-timeout", type=float, default=90, metavar="SECONDS",
+                     help="how long to wait for HTTPS to serve the new files (default: 90)")
+    pub.add_argument("--dry-run", action="store_true", help="check the build without uploading")
+    pub.set_defaults(func=cmd_publish)
 
     try:
         args = parser.parse_args(argv)

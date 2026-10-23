@@ -29,3 +29,19 @@ def write_tree(root, inventory, include_observing=False, skip=None, rename=None,
             path = root / machine.name / FILES[client]
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(fragment(client, names), encoding="utf-8")
+
+
+def make_build(tmp_path, name, inventory_path=EXAMPLE, edit=None, include_observing=False):
+    """Collect fake fragments and build them into tmp_path/name."""
+    from proxyfleet.build import build
+    from proxyfleet.collect import DirSource, collect
+    from proxyfleet.inventory import load
+
+    inventory = load(inventory_path)
+    src = tmp_path / f"{name}-src"
+    write_tree(src, inventory, include_observing=include_observing)
+    if edit:
+        edit(src)
+    collect(inventory, DirSource(src), tmp_path / f"{name}-collected", include_observing=include_observing)
+    build(inventory, tmp_path / f"{name}-collected", tmp_path / name, include_observing=include_observing)
+    return tmp_path / name

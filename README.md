@@ -135,12 +135,37 @@ inventory: changed
 - Builds edited by hand after `build` are rejected (file hashes are checked against the manifest).
 - Exit status is like `diff`: `0` no changes, `1` changes, `2` error. `--json` gives machine-readable output.
 
+### Publishing to your own HTTPS host (unreleased, coming in 0.2)
+
+`publish` uploads a build to a small static server you control, so clients can subscribe to it.
+
+**Once, on a Debian/Ubuntu server** (it may be one of your VPS hosts):
+
+```bash
+git clone https://github.com/godsonkg/proxyfleet && cd proxyfleet
+sudo PF_DOMAIN=sub.example.com PF_UPLOAD_PUBKEY="$(cat your-upload-key.pub)" bash server/setup.sh
+```
+
+This creates an **SFTP-only, chrooted** upload account (`proxyfleet`), a systemd timer that publishes uploaded batches, and a Caddy site that serves only `surge.txt`, `loon.txt` and `mihomo.yaml` under a random 64-character path. Everything else returns 404. Your existing Caddy sites are kept: proxyfleet adds its own file and imports it, and restores your Caddyfile if validation fails.
+
+**On your computer**, copy [`examples/publish.example.yaml`](examples/publish.example.yaml) to `~/.config/proxyfleet/publish.yaml` (Windows: `%APPDATA%\proxyfleet\publish.yaml`), fill it in and `chmod 600` it. Then:
+
+```bash
+proxyfleet publish ~/private/built --dry-run   # checks only
+proxyfleet publish ~/private/built
+```
+
+- Canary builds and builds with an empty client are refused, as are builds edited after `build`.
+- The batch's `.ready` marker is uploaded last. The server then checks the SHA-256 manifest, the contract (clients, counts, inventory hash) and each file's structure before switching the live files with one atomic rename. A rejected batch never touches what clients see, and the last 5 releases are kept.
+- `publish` then downloads every file over HTTPS until its SHA-256 matches, and fails if that does not happen within 90 seconds (`--verify-timeout`).
+- The secret path never appears in any output.
+
 ## Roadmap
 
 | Version | Scope |
 |---|---|
 | 0.1 | `validate`, `plan`, `collect`, `build`, `diff` (done) |
-| 0.2 | `publish` to a static HTTPS host over SFTP with server-side verification and atomic switch; secret path rotation; lifecycle commands (`add`, `promote`, `retire`) |
+| 0.2 | `publish` to a static HTTPS host over SFTP with server-side verification and atomic switch (done, unreleased); secret path rotation; lifecycle commands (`add`, `promote`, `retire`) |
 | 0.3 | Release gates for retired references; append role groups into existing client configs without changing their defaults |
 
 ## Security

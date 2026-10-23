@@ -3,24 +3,10 @@ import json
 import pytest
 import yaml
 
-from proxyfleet.build import build
 from proxyfleet.cli import main
-from proxyfleet.collect import DirSource, collect
 from proxyfleet.diff import DiffError, compare, format_text, load_build
-from proxyfleet.inventory import load
 
-from helpers import EXAMPLE, write_tree
-
-
-def make_build(tmp_path, name, inventory_path=EXAMPLE, edit=None):
-    inventory = load(inventory_path)
-    src = tmp_path / f"{name}-src"
-    write_tree(src, inventory)
-    if edit:
-        edit(src)
-    collect(inventory, DirSource(src), tmp_path / f"{name}-collected")
-    build(inventory, tmp_path / f"{name}-collected", tmp_path / name)
-    return tmp_path / name
+from helpers import EXAMPLE, make_build
 
 
 def promoted_inventory(tmp_path):
